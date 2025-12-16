@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Monitoreo - Estacionamiento</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* TODO EL CSS IGUAL AL ORIGINAL - COMPLETO */
+        :root {
+            --background: 240 10% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 240 10% 6%;
+            --card-foreground: 0 0% 98%;
+            --primary: 0 84% 60%;
+            --primary-foreground: 0 0% 100%;
+            --secondary: 240 3.7% 15.9%;
+            --secondary-foreground: 0 0% 98%;
+            --muted: 240 3.7% 15.9%;
+            --muted-foreground: 240 5% 64.9%;
+            --accent: 240 3.7% 15.9%;
+            --accent-foreground: 0 0% 98%;
+            --destructive: 142 76% 36%;
+            --destructive-foreground: 0 0% 98%;
+            --border: 240 3.7% 15.9%;
+            --input: 240 3.7% 15.9%;
+            --ring: 0 84% 60%;
+            --radius: 0.5rem;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: var(--font-sans);
+        }
+
+        body {
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            min-height: 100vh;
+            overflow: hidden;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .app-header {
+            background: hsl(var(--card));
+            border-bottom: 1px solid hsl(var(--border));
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            flex-wrap: nowrap;
+            min-height: 64px;
+            width: 100%;
+            flex-shrink: 0;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, hsl(var(--primary)), #f87171);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, hsl(var(--primary)), #f87171);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+        }
+
+        .header-filters {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+            min-width: 0;
+            flex-wrap: nowrap;
+        }
+
+        .filter-select {
+            min-width: 150px;
+            max-width: 180px;
+            flex: 1;
+        }
+
+        .search-compact {
+            min-width: 250px;
+            flex: 2;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: var(--radius);
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .btn-icon i {
+            margin: 0;
+        }
+
+        .btn-primary {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary:hover {
+            background: hsl(var(--primary) / 0.9);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+            border: 1px solid hsl(var(--border));
+        }
+
+        .btn-secondary:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+            border-color: hsl(var(--primary));
+        }
+
+        .btn-danger {
+            background: hsl(var(--destructive));
+            color: hsl(var(--destructive-foreground));
+        }
+
+        .btn-danger:hover {
+            background: hsl(var(--destructive) / 0.9);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px hsl(var(--destructive) / 0.3);
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            background: hsl(var(--input));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 0.625rem 0.875rem;
+            color: hsl(var(--foreground));
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            height: 40px;
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='hsl(240 5% 64.9%)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.875rem center;
+            background-size: 16px;
+            padding-right: 2.25rem;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: hsl(var(--primary));
+            box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            gap: 1.5rem;
+            overflow: hidden;
+            width: 100%;
+            height: calc(100vh - 64px);
+        }
+
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            flex-shrink: 0;
+        }
+
+        .status-card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            transition: all 0.2s;
+            min-height: 90px;
+        }
+
+        .status-card:hover {
+            border-color: hsl(var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .status-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .status-card:nth-child(1) .status-icon {
+            background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05));
+            color: hsl(var(--primary));
+        }
+
+        .status-card:nth-child(2) .status-icon {
+            background: linear-gradient(135deg, hsl(0 84% 60% / 0.15), hsl(0 84% 60% / 0.05));
+            color: hsl(0 84% 60%);
+        }
+
+        .status-card:nth-child(3) .status-icon {
+            background: linear-gradient(135deg, hsl(142 76% 36% / 0.15), hsl(142 76% 36% / 0.05));
+            color: hsl(142 76% 36%);
+        }
+
+        .status-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .status-label {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: hsl(var(--muted-foreground));
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.375rem;
+            display: block;
+        }
+
+        .status-value {
+            font-size: 1.75rem;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            color: hsl(var(--foreground));
+            line-height: 1.2;
+        }
+
+        .table-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid hsl(var(--border));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            background: hsl(var(--card));
+        }
+
+        .table-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: hsl(var(--foreground));
+        }
+
+        .table-header h3 i {
+            color: hsl(var(--primary));
+        }
+
+        .date-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .date-input {
+            width: 150px;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow: auto;
+            min-height: 0;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+
+        th {
+            background: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8125rem;
+            position: sticky;
+            top: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid hsl(var(--border));
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid hsl(var(--border) / 0.5);
+            font-size: 0.875rem;
+            color: hsl(var(--foreground));
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: hsl(var(--accent) / 0.2);
+        }
+
+        .tipo-ingreso {
+            background: linear-gradient(90deg, hsl(142 76% 36% / 0.05) 0%, transparent 100%);
+        }
+
+        .tipo-salida {
+            background: linear-gradient(90deg, hsl(0 84% 60% / 0.05) 0%, transparent 100%);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            display: inline-block;
+            font-family: var(--font-mono);
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-ingreso {
+            background: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 42%));
+            color: white;
+            box-shadow: 0 2px 8px hsl(142 76% 36% / 0.3);
+        }
+
+        .badge-salida {
+            background: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 84% 66%));
+            color: white;
+            box-shadow: 0 2px 8px hsl(0 84% 60% / 0.3);
+        }
+
+        .app-footer {
+            flex-shrink: 0;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid hsl(var(--border));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            background: hsl(var(--card));
+            margin-top: auto;
+        }
+
+        .update-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .update-info i {
+            color: hsl(var(--primary));
+        }
+
+        .record-count {
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            font-family: var(--font-mono);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            color: hsl(var(--muted-foreground));
+            text-align: center;
+            flex: 1;
+        }
+
+        .empty-state i {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            color: hsl(var(--muted-foreground) / 0.3);
+        }
+
+        .empty-state h3 {
+            font-size: 1.375rem;
+            margin-bottom: 0.75rem;
+            color: hsl(var(--foreground));
+            font-weight: 600;
+        }
+
+        .empty-state p {
+            font-size: 0.9375rem;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        /* ============ MODALES ============ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-contenido {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) + 4px);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-title i {
+            color: hsl(var(--primary));
+        }
+
+        .close-modal {
+            background: transparent;
+            border: none;
+            color: hsl(var(--muted-foreground));
+            font-size: 1.25rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            transition: all 0.2s;
+        }
+
+        .close-modal:hover {
+            background: hsl(var(--muted));
+            color: hsl(var(--foreground));
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-label i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        .form-input-modal, .form-select-modal, .form-textarea {
+            width: 100%;
+            background: hsl(var(--input));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 0.75rem 1rem;
+            color: hsl(var(--foreground));
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .form-input-modal:focus, .form-select-modal:focus, .form-textarea:focus {
+            outline: none;
+            border-color: hsl(var(--primary));
+            box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+        }
+
+        .form-select-modal {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='hsl(240 5% 64.9%)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 16px;
+            padding-right: 2.5rem;
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid transparent;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary:hover {
+            background: hsl(var(--primary) / 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+            border: 1px solid hsl(var(--border));
+        }
+
+        .btn-secondary:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid hsl(var(--border));
+        }
+
+        /* ============ LISTA AUTORIZADOS ============ */
+        .autorizados-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            background: hsl(var(--background));
+        }
+
+        .autorizado-item {
+            padding: 1rem;
+            border-bottom: 1px solid hsl(var(--border));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .autorizado-item:hover {
+            background: hsl(var(--accent) / 0.1);
+        }
+
+        .autorizado-info {
+            flex: 1;
+        }
+
+        .autorizado-nombre {
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            margin-bottom: 0.25rem;
+        }
+
+        .autorizado-details {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .autorizado-patente {
+            background: hsl(var(--primary) / 0.1);
+            color: hsl(var(--primary));
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .autorizado-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .autorizado-status.activo {
+            background: hsl(142 76% 36% / 0.1);
+            color: hsl(142 76% 36%);
+        }
+
+        .autorizado-status.inactivo {
+            background: hsl(0 84% 60% / 0.1);
+            color: hsl(0 84% 60%);
+        }
+
+        /* ============ FILTROS AUTORIZADOS ============ */
+        .filtros-autorizados {
+            background: hsl(var(--background));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .filtro-autorizado-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filtro-autorizado-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filtro-autorizado-label i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .rotating i {
+            animation: rotate 1s linear infinite;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: hsl(var(--background));
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: hsl(var(--primary) / 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: hsl(var(--primary));
+        }
+
+        .glow {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glow::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .glow:hover::before {
+            left: 100%;
+        }
+
+        .btn-icon {
+            position: relative;
+        }
+
+        .btn-icon::after {
+            content: attr(title);
+            position: absolute;
+            bottom: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: hsl(var(--card));
+            color: hsl(var(--foreground));
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            border: 1px solid hsl(var(--border));
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .btn-icon:hover::after {
+            opacity: 1;
+            visibility: visible;
+            bottom: -35px;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideInRight 0.3s ease;
+            display: none;
+            border: 1px solid;
+            max-width: 350px;
+            backdrop-filter: blur(10px);
+        }
+
+        .notification.success {
+            background: hsl(142 76% 36% / 0.15);
+            color: hsl(142 76% 36%);
+            border-color: hsl(142 76% 36% / 0.3);
+        }
+
+        .notification.warning {
+            background: hsl(38 92% 50% / 0.15);
+            color: hsl(38 92% 50%);
+            border-color: hsl(38 92% 50% / 0.3);
+        }
+
+        .notification.error {
+            background: hsl(0 84% 60% / 0.15);
+            color: hsl(0 84% 60%);
+            border-color: hsl(0 84% 60% / 0.3);
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideOutRight {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(100%); }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+                gap: 1rem;
+            }
+            
+            .status-cards {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+            
+            .table-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
+            
+            .date-filter {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .date-input {
+                width: calc(50% - 0.375rem);
+            }
+            
+            .app-footer {
+                padding: 0.875rem 1rem;
+                flex-direction: column;
+                gap: 0.75rem;
+                text-align: center;
+            }
+            
+            .modal-contenido {
+                padding: 1.5rem;
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-left">
+                <div class="app-logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <span class="logo-text">Monitoreo Estacionamiento</span>
+                </div>
+                
+                <div class="header-filters">
+                    <select class="form-select filter-select" id="filtroTipo">
+                        <option value="todos">📊 Todos</option>
+                        <option value="INGRESO">⬆️ Ingresos</option>
+                        <option value="SALIDA">⬇️ Salidas</option>
+                    </select>
+                    
+                    <select class="form-select filter-select" id="filtroTipoAuto">
+                        <option value="todos">🚗 Todos</option>
+                        <option value="Auto">🚙 Auto</option>
+                        <option value="Camioneta">🚚 Camioneta</option>
+                        <option value="Moto">🏍️ Moto</option>
+                    </select>
+                    
+                    <select class="form-select filter-select" id="filtroTipoCliente">
+                        <option value="todos">👥 Todos</option>
+                        <option value="Cliente de hotel">🏨 Hotel</option>
+                        <option value="Cliente de casino">🎰 Casino</option>
+                        <option value="Personal">👔 Personal</option>
+                    </select>
+                    
+                    <input type="text" class="form-input search-compact" id="searchGlobal" placeholder="🔍 Buscar en todos los campos...">
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Nuevo botón para Autorizados -->
+                <button class="btn-icon btn-secondary" onclick="abrirModalAutorizados()" title="Ver Autorizados">
+                    <i class="fas fa-user-check"></i>
+                </button>
+                
+                <button class="btn-icon btn-secondary" onclick="limpiarFiltros()" title="Limpiar filtros (ESC)">
+                    <i class="fas fa-broom"></i>
+                </button>
+                
+                <button class="btn-icon btn-primary refresh-btn" onclick="cargarDatos()" title="Actualizar datos (Ctrl+R)">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                
+                <button class="btn-icon btn-danger" onclick="exportarDatosFiltrados()" title="Exportar CSV (Ctrl+E)">
+                    <i class="fas fa-file-export"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="status-cards">
+                <div class="status-card glow">
+                    <div class="status-icon">
+                        <i class="fas fa-parking"></i>
+                    </div>
+                    <div class="status-content">
+                        <span class="status-label">Total Plazas</span>
+                        <div class="status-value" id="total">57</div>
+                    </div>
+                </div>
+                
+                <div class="status-card glow">
+                    <div class="status-icon">
+                        <i class="fas fa-car"></i>
+                    </div>
+                    <div class="status-content">
+                        <span class="status-label">Ocupadas</span>
+                        <div class="status-value" id="ocupadas">0</div>
+                    </div>
+                </div>
+                
+                <div class="status-card glow">
+                    <div class="status-icon">
+                        <i class="fas fa-sign"></i>
+                    </div>
+                    <div class="status-content">
+                        <span class="status-label">Libres</span>
+                        <div class="status-value" id="libres">57</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header">
+                    <h3><i class="fas fa-history"></i> Historial de Movimientos</h3>
+                    <div class="date-filter">
+                        <input type="date" class="form-input date-input" id="fechaDesde">
+                        <span style="color: hsl(var(--muted-foreground)); font-weight: 500;">hasta</span>
+                        <input type="date" class="form-input date-input" id="fechaHasta">
+                        <button class="btn-icon btn-secondary" onclick="aplicarFiltroFechas()" title="Aplicar filtro de fechas" style="margin-left: 0.5rem;">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container" id="tableScroll">
+                    <div id="tablaContenido">
+                        <div class="empty-state">
+                            <i class="fas fa-database"></i>
+                            <h3>Cargando datos...</h3>
+                            <p>Presiona el botón de actualizar o espera a que se carguen automáticamente</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="update-info">
+                <i class="fas fa-clock"></i>
+                Última actualización: <span id="ultimaActualizacion">-</span>
+                | <span id="firebaseStatus">Conectando...</span>
+            </div>
+            <div class="record-count">
+                <span id="registrosMostrados">0</span> de <span id="totalRegistros">0</span> registros
+            </div>
+        </footer>
+    </div>
+
+    <!-- MODAL AUTORIZADOS -->
+    <div class="modal" id="modalAutorizados">
+        <div class="modal-contenido" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-user-check"></i>
+                    Personas Autorizadas
+                </h3>
+                <button class="close-modal" onclick="cerrarModal('modalAutorizados')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Botón para agregar nuevo autorizado -->
+            <div style="margin-bottom: 1.5rem;">
+                <button class="btn btn-primary" onclick="abrirModalNuevoAutorizado()">
+                    <i class="fas fa-plus-circle"></i>
+                    Agregar Nueva Persona Autorizada
+                </button>
+            </div>
+
+            <!-- FILTROS DE AUTORIZADOS -->
+            <div class="filtros-autorizados">
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-id-card"></i>
+                        Patente
+                    </label>
+                    <input type="text" class="form-input-modal" id="filtroPatenteAutorizados" 
+                           placeholder="Filtrar por patente" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-user"></i>
+                        Nombre
+                    </label>
+                    <input type="text" class="form-input-modal" id="filtroNombreAutorizados" 
+                           placeholder="Filtrar por nombre" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-car"></i>
+                        Marca de Auto
+                    </label>
+                    <input type="text" class="form-input-modal" id="filtroMarcaAutorizados" 
+                           placeholder="Filtrar por marca" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-filter"></i>
+                        Estado
+                    </label>
+                    <select class="form-select-modal" id="filtroEstadoAutorizados" onchange="filtrarAutorizados()">
+                        <option value="todos">Todos los estados</option>
+                        <option value="activo">Solo activos</option>
+                        <option value="inactivo">Solo inactivos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: hsl(var(--muted-foreground)); font-weight: 600;">
+                    <i class="fas fa-users"></i>
+                    Total: <span id="contadorAutorizados">0</span> autorizados
+                </span>
+                <button class="btn btn-secondary" onclick="resetearFiltrosAutorizados()">
+                    <i class="fas fa-redo"></i>
+                    Limpiar Filtros
+                </button>
+            </div>
+
+            <div class="autorizados-list" id="listaAutorizados">
+                <!-- Lista cargada dinámicamente -->
+                <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div>Cargando autorizados...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVO AUTORIZADO -->
+    <div class="modal" id="modalNuevoAutorizado">
+        <div class="modal-contenido">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    Agregar Persona Autorizada
+                </h3>
+                <button class="close-modal" onclick="cerrarModal('modalNuevoAutorizado')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user"></i>
+                    Nombre Completo *
+                </label>
+                <input type="text" class="form-input-modal" id="autorizadoNombre" 
+                       placeholder="Ej: Juan Pérez" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-id-card"></i>
+                    Patente *
+                </label>
+                <input type="text" class="form-input-modal" id="autorizadoPatente" 
+                       placeholder="Ej: ABC123" required
+                       oninput="this.value = this.value.toUpperCase()">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-car"></i>
+                    Marca de Auto *
+                </label>
+                <input type="text" class="form-input-modal" id="autorizadoMarca" 
+                       placeholder="Ej: Toyota, Ford, Honda..." required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user-tie"></i>
+                    Quien Autoriza *
+                </label>
+                <input type="text" class="form-input-modal" id="autorizadoQuien" 
+                       placeholder="Ej: Gerencia, Supervisor, Dueño..." required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-door-open"></i>
+                    Habitación (opcional)
+                </label>
+                <input type="text" class="form-input-modal" id="autorizadoHabitacion" 
+                       placeholder="Ej: 101">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-users"></i>
+                    Tipo de Cliente (opcional)
+                </label>
+                <select class="form-select-modal" id="autorizadoTipoCliente">
+                    <option value="">Seleccionar tipo</option>
+                    <option value="Cliente de hotel">Cliente de hotel</option>
+                    <option value="Cliente de casino">Cliente de casino</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Visita">Visita</option>
+                    <option value="Proveedor">Proveedor</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-sticky-note"></i>
+                    Observaciones (opcional)
+                </label>
+                <textarea class="form-textarea" id="autorizadoObservaciones" 
+                          placeholder="Detalles adicionales..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-toggle-on"></i>
+                    Estado
+                </label>
+                <select class="form-select-modal" id="autorizadoEstado">
+                    <option value="true">Activo</option>
+                    <option value="false">Inactivo</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="cerrarModal('modalNuevoAutorizado')">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button class="btn btn-primary" onclick="guardarNuevoAutorizado()">
+                    <i class="fas fa-save"></i>
+                    Guardar Autorizado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification" style="display: none;"></div>
+
+    <script>
+        // ============ CONFIGURACIÓN FIREBASE ============
+        // ⚠️ REEMPLAZA ESTAS CREDENCIALES CON LAS MISMAS DE INDEX.HTML ⚠️
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAeF1euvJ_-GEhXyxmcoXMsugeKjA4VRM",
+            authDomain: "estacionamiento-gala.firebaseapp.com",
+            projectId: "estacionamiento-gala",
+            storageBucket: "estacionamiento-gala.firebasestorage.app",
+            messagingSenderId: "19666484948",
+            appId: "1:19666484948:web:1a33118a8040ba9815c541"
+        };const firebaseConfig = {
+
+        // Inicializar Firebase
+        let db;
+        let datosCompletos = [];
+        let datosFiltrados = [];
+        let autorizados = [];
+        let filtrosActivos = {
+            tipo: 'todos',
+            tipoAuto: 'todos',
+            tipoCliente: 'todos',
+            fechaDesde: '',
+            fechaHasta: '',
+            busqueda: ''
+        };
+
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            
+            // Habilitar persistencia offline
+            db.enablePersistence()
+                .then(() => {
+                    console.log("✅ Persistencia offline activada");
+                })
+                .catch((err) => {
+                    console.warn("⚠️ Persistencia no disponible:", err);
+                });
+            
+            document.getElementById('firebaseStatus').textContent = 'Firebase: Conectado';
+            document.getElementById('firebaseStatus').style.color = 'hsl(142 76% 36%)';
+            
+        } catch (error) {
+            console.error("❌ Error al inicializar Firebase:", error);
+            document.getElementById('firebaseStatus').textContent = 'Modo Local (sin Firebase)';
+            document.getElementById('firebaseStatus').style.color = 'hsl(0 84% 60%)';
+        }
+
+        // 🎯 FUNCIÓN NUEVA: Convertir fecha DD/MM/YYYY a YYYY-MM-DD para comparar
+        function convertirFechaParaComparar(fechaTexto) {
+            if (!fechaTexto) return null;
+            
+            try {
+                // Formato en los datos: "DD/MM/YYYY HH:MM:SS"
+                const soloFecha = fechaTexto.split(' ')[0]; // Obtener "DD/MM/YYYY"
+                const partes = soloFecha.split('/');
+                
+                if (partes.length === 3) {
+                    const dia = parseInt(partes[0]);
+                    const mes = parseInt(partes[1]) - 1; // Mes en JS es 0-11
+                    const año = parseInt(partes[2]);
+                    
+                    return new Date(año, mes, dia);
+                }
+            } catch (e) {
+                console.error('Error convirtiendo fecha:', fechaTexto, e);
+            }
+            return null;
+        }
+
+        // 🎯 FUNCIÓN NUEVA: Convertir input date (YYYY-MM-DD) a Date
+        function convertirInputFecha(inputFecha) {
+            if (!inputFecha) return null;
+            return new Date(inputFecha);
+        }
+
+        // 🎯 APLICAR FILTRO DE FECHAS
+        function aplicarFiltroFechas() {
+            const fechaDesdeInput = document.getElementById('fechaDesde').value;
+            const fechaHastaInput = document.getElementById('fechaHasta').value;
+            
+            filtrosActivos.fechaDesde = fechaDesdeInput;
+            filtrosActivos.fechaHasta = fechaHastaInput;
+            
+            const fechaDesdeDate = convertirInputFecha(fechaDesdeInput);
+            const fechaHastaDate = convertirInputFecha(fechaHastaInput);
+            
+            if (fechaDesdeDate && fechaHastaDate && fechaDesdeDate > fechaHastaDate) {
+                mostrarNotificacion('⚠️ Fecha "Desde" no puede ser mayor que "Hasta"', 'warning', 3000);
+                return;
+            }
+            
+            aplicarFiltrosCompletos();
+            
+            if (fechaDesdeInput || fechaHastaInput) {
+                const mensaje = fechaDesdeInput && fechaHastaInput 
+                    ? `📅 Filtro aplicado: ${fechaDesdeInput} a ${fechaHastaInput}`
+                    : fechaDesdeInput 
+                        ? `📅 Filtro aplicado desde: ${fechaDesdeInput}`
+                        : `📅 Filtro aplicado hasta: ${fechaHastaInput}`;
+                
+                mostrarNotificacion(mensaje, 'success', 2000);
+            }
+        }
+
+        // 🎯 APLICAR FILTROS COMPLETOS (incluyendo fecha)
+        function aplicarFiltrosCompletos() {
+            filtrosActivos.tipo = document.getElementById('filtroTipo').value;
+            filtrosActivos.tipoAuto = document.getElementById('filtroTipoAuto').value;
+            filtrosActivos.tipoCliente = document.getElementById('filtroTipoCliente').value;
+            filtrosActivos.busqueda = document.getElementById('searchGlobal').value.toLowerCase();
+            
+            const fechaDesdeFiltro = convertirInputFecha(filtrosActivos.fechaDesde);
+            const fechaHastaFiltro = convertirInputFecha(filtrosActivos.fechaHasta);
+            
+            datosFiltrados = datosCompletos.filter(movimiento => {
+                if (filtrosActivos.tipo !== 'todos' && movimiento.tipo !== filtrosActivos.tipo) {
+                    return false;
+                }
+                
+                if (filtrosActivos.tipoAuto !== 'todos' && movimiento.tipoAuto !== filtrosActivos.tipoAuto) {
+                    return false;
+                }
+                
+                if (filtrosActivos.tipoCliente !== 'todos' && movimiento.tipoCliente !== filtrosActivos.tipoCliente) {
+                    return false;
+                }
+                
+                if (fechaDesdeFiltro || fechaHastaFiltro) {
+                    const fechaMovimiento = convertirFechaParaComparar(movimiento.fechaLegible);
+                    
+                    if (!fechaMovimiento) return false;
+                    
+                    if (fechaDesdeFiltro && fechaMovimiento < fechaDesdeFiltro) {
+                        return false;
+                    }
+                    
+                    if (fechaHastaFiltro) {
+                        const fechaHastaMasUnDia = new Date(fechaHastaFiltro);
+                        fechaHastaMasUnDia.setDate(fechaHastaMasUnDia.getDate() + 1);
+                        
+                        if (fechaMovimiento >= fechaHastaMasUnDia) {
+                            return false;
+                        }
+                    }
+                }
+                
+                if (filtrosActivos.busqueda) {
+                    const textoCompleto = Object.values(movimiento)
+                        .filter(val => typeof val === 'string')
+                        .join(' ')
+                        .toLowerCase();
+                    
+                    if (!textoCompleto.includes(filtrosActivos.busqueda)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            mostrarTablaFiltrada();
+            
+            document.getElementById('totalRegistros').textContent = datosCompletos.length;
+            document.getElementById('registrosMostrados').textContent = datosFiltrados.length;
+            
+            if (datosCompletos.length > 0 && datosFiltrados.length === 0) {
+                mostrarNotificacion('🔍 No hay resultados con esos filtros', 'warning', 2000);
+            }
+        }
+
+        // 🎯 APLICAR FILTROS (sin fecha - para otros filtros)
+        function aplicarFiltros() {
+            filtrosActivos.tipo = document.getElementById('filtroTipo').value;
+            filtrosActivos.tipoAuto = document.getElementById('filtroTipoAuto').value;
+            filtrosActivos.tipoCliente = document.getElementById('filtroTipoCliente').value;
+            filtrosActivos.busqueda = document.getElementById('searchGlobal').value.toLowerCase();
+            
+            aplicarFiltrosCompletos();
+        }
+
+        // 🎯 FUNCIONES DE FORMATO
+        function formatearFechaHoraConSegundos(fecha) {
+            if (!fecha) return '';
+            return fecha.toLocaleString("es-AR", {
+                year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit", second: "2-digit",
+                hour12: false
+            });
+        }
+
+        // 🎯 NOTIFICACIÓN
+        function mostrarNotificacion(mensaje, tipo = 'success', duracion = 3000) {
+            const notif = document.getElementById('notification');
+            notif.textContent = mensaje;
+            notif.className = `notification ${tipo}`;
+            notif.style.display = 'block';
+            
+            notif.style.animation = 'none';
+            setTimeout(() => {
+                notif.style.animation = 'slideInRight 0.3s ease';
+            }, 10);
+            
+            setTimeout(() => {
+                notif.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => {
+                    notif.style.display = 'none';
+                }, 300);
+            }, duracion);
+        }
+
+        // 🎯 CARGAR DATOS DESDE FIREBASE
+        async function cargarDatos() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.classList.add('rotating');
+            btn.disabled = true;
+            
+            mostrarTablaVacia('Cargando datos...', 'fa-sync-alt', 'Por favor espera...');
+            
+            try {
+                if (!db) {
+                    throw new Error('Firebase no está configurado');
+                }
+                
+                // Cargar movimientos de Firebase
+                const snapshot = await db.collection('movimientos')
+                    .orderBy('timestamp', 'desc')
+                    .limit(200)
+                    .get();
+                
+                if (snapshot.empty) {
+                    datosCompletos = [];
+                    mostrarTablaVacia('No hay datos registrados');
+                    mostrarNotificacion('⚠️ Sistema vacío - Sin movimientos', 'warning');
+                    return;
+                }
+                
+                datosCompletos = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    const timestamp = data.timestamp ? data.timestamp.toDate() : new Date();
+                    return {
+                        ...data,
+                        fechaLegible: formatearFechaHoraConSegundos(timestamp)
+                    };
+                });
+                
+                // Cargar autorizados
+                await cargarAutorizados();
+                
+                // Actualizar estado de plazas
+                actualizarEstadoPlazas();
+                
+                // Aplicar filtros iniciales
+                datosFiltrados = [...datosCompletos];
+                aplicarFiltroFechas();
+                
+                mostrarNotificacion(`✅ ${datosCompletos.length} registros cargados`, 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarTablaVacia(`❌ Error: ${error.message}`);
+                mostrarNotificacion('❌ Error al cargar datos', 'error');
+            } finally {
+                btn.classList.remove('rotating');
+                btn.disabled = false;
+                const ahora = new Date();
+                document.getElementById('ultimaActualizacion').textContent = 
+                    `${ahora.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+            }
+        }
+
+        // 🎯 CARGAR AUTORIZADOS DESDE FIREBASE
+        async function cargarAutorizados() {
+            try {
+                if (!db) {
+                    autorizados = [];
+                    return;
+                }
+                
+                const snapshot = await db.collection('autorizados').get();
+                autorizados = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                console.log(`✅ ${autorizados.length} autorizados cargados`);
+                
+            } catch (error) {
+                console.error("❌ Error al cargar autorizados:", error);
+                autorizados = [];
+            }
+        }
+
+        // 🎯 ACTUALIZAR ESTADO DE PLAZAS
+        function actualizarEstadoPlazas() {
+            // Cargar estado actual de plazas desde Firebase
+            if (db) {
+                db.collection('plazas').get().then(snapshot => {
+                    const plazasOcupadas = snapshot.docs.filter(doc => doc.data().ocupada).length;
+                    const totalPlazas = 57;
+                    
+                    document.getElementById('total').textContent = totalPlazas;
+                    document.getElementById('ocupadas').textContent = plazasOcupadas;
+                    document.getElementById('libres').textContent = totalPlazas - plazasOcupadas;
+                }).catch(error => {
+                    console.error("Error al cargar estado de plazas:", error);
+                });
+            }
+        }
+
+        // 🎯 LIMPIAR FILTROS
+        function limpiarFiltros() {
+            document.getElementById('filtroTipo').value = 'todos';
+            document.getElementById('filtroTipoAuto').value = 'todos';
+            document.getElementById('filtroTipoCliente').value = 'todos';
+            document.getElementById('searchGlobal').value = '';
+            
+            const hoy = new Date();
+            const hace7Dias = new Date();
+            hace7Dias.setDate(hoy.getDate() - 7);
+            
+            document.getElementById('fechaDesde').value = hace7Dias.toISOString().split('T')[0];
+            document.getElementById('fechaHasta').value = hoy.toISOString().split('T')[0];
+            
+            filtrosActivos = {
+                tipo: 'todos',
+                tipoAuto: 'todos',
+                tipoCliente: 'todos',
+                fechaDesde: hace7Dias.toISOString().split('T')[0],
+                fechaHasta: hoy.toISOString().split('T')[0],
+                busqueda: ''
+            };
+            
+            aplicarFiltrosCompletos();
+            
+            mostrarNotificacion('🔄 Filtros restablecidos', 'success');
+        }
+
+        // 🎯 MOSTRAR TABLA FILTRADA
+        function mostrarTablaFiltrada() {
+            const tablaContenido = document.getElementById('tablaContenido');
+            
+            if (datosFiltrados.length === 0) {
+                mostrarTablaVacia(datosCompletos.length === 0 
+                    ? '📭 No hay datos registrados' 
+                    : '🔍 No hay resultados con los filtros aplicados');
+                return;
+            }
+            
+            let html = `<table>
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Acción</th>
+                        <th>Plaza</th>
+                        <th>Tipo</th>
+                        <th>Patente</th>
+                        <th>Nombre</th>
+                        <th>Habitación</th>
+                        <th>Cliente</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            datosFiltrados.forEach(movimiento => {
+                const obs = movimiento.observaciones || '';
+                html += `
+                    <tr class="${movimiento.tipo === 'INGRESO' ? 'tipo-ingreso' : 'tipo-salida'}">
+                        <td>${movimiento.fechaLegible || '-'}</td>
+                        <td><span class="badge ${movimiento.tipo === 'INGRESO' ? 'badge-ingreso' : 'badge-salida'}">${movimiento.tipo}</span></td>
+                        <td><strong>${movimiento.plaza || '-'}</strong></td>
+                        <td>${movimiento.tipoAuto || '-'}</td>
+                        <td><code>${movimiento.patente || '-'}</code></td>
+                        <td>${movimiento.nombre || '-'}</td>
+                        <td>${movimiento.habitacion || '-'}</td>
+                        <td>${movimiento.tipoCliente || '-'}</td>
+                        <td title="${obs}">${obs.substring(0, 30)}${obs.length > 30 ? '...' : ''}</td>
+                    </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            tablaContenido.innerHTML = html;
+            
+            document.getElementById('tableScroll').scrollTop = 0;
+        }
+
+        // 🎯 MOSTRAR TABLA VACÍA
+        function mostrarTablaVacia(mensaje, icono = 'fa-database', detalle = '') {
+            const iconoFinal = icono || (mensaje.includes('No hay datos') ? 'fa-database' : 'fa-search');
+            const detalleFinal = detalle || (mensaje.includes('No hay datos') 
+                ? 'El sistema está vacío, no se han registrado movimientos'
+                : 'Intenta ajustar los criterios de búsqueda');
+            
+            document.getElementById('tablaContenido').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas ${iconoFinal}"></i>
+                    <h3>${mensaje}</h3>
+                    <p>${detalleFinal}</p>
+                </div>`;
+            
+            document.getElementById('totalRegistros').textContent = datosCompletos.length;
+            document.getElementById('registrosMostrados').textContent = '0';
+        }
+
+        // 🎯 EXPORTAR DATOS
+        function exportarDatosFiltrados() {
+            if (datosFiltrados.length === 0) {
+                mostrarNotificacion('⚠️ No hay datos para exportar', 'warning');
+                return;
+            }
+            
+            let csv = 'Fecha;Acción;Plaza;Tipo Auto;Patente;Nombre;Habitación;Tipo Cliente;Observaciones\n';
+            
+            datosFiltrados.forEach(m => {
+                const obs = (m.observaciones || '').replace(/"/g, "'").replace(/\n/g, ' ').replace(/;/g, ',');
+                csv += `"${m.fechaLegible}";${m.tipo};${m.plaza};${m.tipoAuto};${m.patente};${m.nombre};${m.habitacion};${m.tipoCliente};"${obs}"\n`;
+            });
+            
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const fecha = new Date().toISOString().slice(0,10).replace(/-/g, '');
+            a.download = `Estacionamiento_${fecha}_${datosFiltrados.length}_registros.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            mostrarNotificacion(`📊 Exportados ${datosFiltrados.length} registros`, 'success');
+        }
+
+        // ============ FUNCIONALIDAD AUTORIZADOS ============
+
+        // 🎯 ABRIR MODAL AUTORIZADOS
+        async function abrirModalAutorizados() {
+            if (!db) {
+                mostrarNotificacion('⚠️ Firebase no está configurado', 'error');
+                return;
+            }
+            
+            // Cargar autorizados si no están cargados
+            if (autorizados.length === 0) {
+                await cargarAutorizados();
+            }
+            
+            // Resetear filtros de autorizados
+            document.getElementById('filtroPatenteAutorizados').value = '';
+            document.getElementById('filtroNombreAutorizados').value = '';
+            document.getElementById('filtroMarcaAutorizados').value = '';
+            document.getElementById('filtroEstadoAutorizados').value = 'todos';
+            
+            // Mostrar autorizados
+            mostrarAutorizados();
+            document.getElementById('modalAutorizados').classList.add('active');
+        }
+
+        // 🎯 MOSTRAR AUTORIZADOS
+        function mostrarAutorizados() {
+            const lista = document.getElementById('listaAutorizados');
+            const contador = document.getElementById('contadorAutorizados');
+            
+            if (autorizados.length === 0) {
+                lista.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                        <i class="fas fa-user-slash" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <div>No hay personas autorizadas registradas</div>
+                        <small style="margin-top: 0.5rem; display: block;">
+                            Haz clic en "Agregar Nueva Persona Autorizada" para comenzar
+                        </small>
+                    </div>
+                `;
+                contador.textContent = '0';
+                return;
+            }
+            
+            filtrarAutorizados();
+        }
+
+        // 🎯 FILTRAR AUTORIZADOS
+        function filtrarAutorizados() {
+            const lista = document.getElementById('listaAutorizados');
+            const contador = document.getElementById('contadorAutorizados');
+            
+            const filtroPatente = document.getElementById('filtroPatenteAutorizados').value.toLowerCase();
+            const filtroNombre = document.getElementById('filtroNombreAutorizados').value.toLowerCase();
+            const filtroMarca = document.getElementById('filtroMarcaAutorizados').value.toLowerCase();
+            const filtroEstado = document.getElementById('filtroEstadoAutorizados').value;
+            
+            let autorizadosFiltrados = autorizados;
+            
+            if (filtroPatente) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.patente && a.patente.toLowerCase().includes(filtroPatente)
+                );
+            }
+            
+            if (filtroNombre) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.nombre && a.nombre.toLowerCase().includes(filtroNombre)
+                );
+            }
+            
+            if (filtroMarca) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.marca && a.marca.toLowerCase().includes(filtroMarca)
+                );
+            }
+            
+            if (filtroEstado === 'activo') {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => a.activo === true);
+            } else if (filtroEstado === 'inactivo') {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => a.activo === false);
+            }
+            
+            contador.textContent = autorizadosFiltrados.length;
+            
+            if (autorizadosFiltrados.length === 0) {
+                lista.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <div>No se encontraron autorizados con los filtros aplicados</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            autorizadosFiltrados.sort((a, b) => {
+                const nombreA = a.nombre || '';
+                const nombreB = b.nombre || '';
+                return nombreA.localeCompare(nombreB);
+            });
+            
+            let html = '';
+            autorizadosFiltrados.forEach(autorizado => {
+                html += `
+                    <div class="autorizado-item" data-id="${autorizado.id}">
+                        <div class="autorizado-info">
+                            <div class="autorizado-nombre">${autorizado.nombre || 'Sin nombre'}</div>
+                            <div class="autorizado-details">
+                                <span class="autorizado-patente">${autorizado.patente || 'Sin patente'}</span>
+                                <span>Marca: ${autorizado.marca || 'No especificada'}</span>
+                                <span>Hab: ${autorizado.habitacion || 'N/A'}</span>
+                                <span>Autoriza: ${autorizado.quienAutoriza || 'No especificado'}</span>
+                            </div>
+                        </div>
+                        <div class="autorizado-status ${autorizado.activo ? 'activo' : 'inactivo'}">
+                            ${autorizado.activo ? 'ACTIVO' : 'INACTIVO'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            lista.innerHTML = html;
+        }
+
+        // 🎯 RESETEAR FILTROS AUTORIZADOS
+        function resetearFiltrosAutorizados() {
+            document.getElementById('filtroPatenteAutorizados').value = '';
+            document.getElementById('filtroNombreAutorizados').value = '';
+            document.getElementById('filtroMarcaAutorizados').value = '';
+            document.getElementById('filtroEstadoAutorizados').value = 'todos';
+            
+            filtrarAutorizados();
+            mostrarNotificacion('✅ Filtros de autorizados restablecidos', 'success');
+        }
+
+        // 🎯 ABRIR MODAL NUEVO AUTORIZADO
+        function abrirModalNuevoAutorizado() {
+            // Limpiar formulario
+            document.getElementById('autorizadoNombre').value = '';
+            document.getElementById('autorizadoPatente').value = '';
+            document.getElementById('autorizadoMarca').value = '';
+            document.getElementById('autorizadoQuien').value = '';
+            document.getElementById('autorizadoHabitacion').value = '';
+            document.getElementById('autorizadoTipoCliente').value = '';
+            document.getElementById('autorizadoObservaciones').value = '';
+            document.getElementById('autorizadoEstado').value = 'true';
+            
+            cerrarModal('modalAutorizados');
+            document.getElementById('modalNuevoAutorizado').classList.add('active');
+        }
+
+        // 🎯 GUARDAR NUEVO AUTORIZADO
+        async function guardarNuevoAutorizado() {
+            const nombre = document.getElementById('autorizadoNombre').value.trim();
+            const patente = document.getElementById('autorizadoPatente').value.trim().toUpperCase();
+            const marca = document.getElementById('autorizadoMarca').value.trim();
+            const quienAutoriza = document.getElementById('autorizadoQuien').value.trim();
+            
+            if (!nombre || !patente || !marca || !quienAutoriza) {
+                mostrarNotificacion('⚠️ Por favor completa los campos obligatorios', 'warning');
+                return;
+            }
+            
+            const habitacion = document.getElementById('autorizadoHabitacion').value.trim();
+            const tipoCliente = document.getElementById('autorizadoTipoCliente').value;
+            const observaciones = document.getElementById('autorizadoObservaciones').value.trim();
+            const activo = document.getElementById('autorizadoEstado').value === 'true';
+            
+            const autorizadoData = {
+                nombre,
+                patente,
+                marca,
+                quienAutoriza,
+                habitacion: habitacion || '',
+                tipoCliente: tipoCliente || '',
+                observaciones: observaciones || '',
+                activo,
+                fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
+                fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            try {
+                if (!db) {
+                    throw new Error('Firebase no está configurado');
+                }
+                
+                // Guardar en Firebase
+                await db.collection('autorizados').add(autorizadoData);
+                
+                // Actualizar lista local
+                autorizados.push({
+                    id: 'temp_id', // Se actualizará cuando se recargue
+                    ...autorizadoData
+                });
+                
+                mostrarNotificacion(`✅ ${nombre} ha sido agregado como autorizado`, 'success');
+                cerrarModal('modalNuevoAutorizado');
+                
+                // Reabrir modal de autorizados con los datos actualizados
+                setTimeout(() => {
+                    abrirModalAutorizados();
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error al guardar autorizado:', error);
+                mostrarNotificacion('❌ Error al guardar autorizado', 'error');
+            }
+        }
+
+        // 🎯 CERRAR MODAL
+        function cerrarModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // 🎯 INICIALIZAR EVENTOS
+        function inicializarEventos() {
+            // Eventos para filtros
+            ['filtroTipo', 'filtroTipoAuto', 'filtroTipoCliente']
+                .forEach(id => document.getElementById(id).addEventListener('change', aplicarFiltros));
+            
+            // Búsqueda con debounce
+            let searchTimeout;
+            document.getElementById('searchGlobal').addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    filtrosActivos.busqueda = e.target.value.toLowerCase();
+                    aplicarFiltros();
+                }, 300);
+            });
+            
+            // Atajos de teclado
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'r') {
+                    e.preventDefault();
+                    cargarDatos();
+                }
+                if (e.ctrlKey && e.key === 'e') {
+                    e.preventDefault();
+                    exportarDatosFiltrados();
+                }
+                if (e.key === 'Escape') {
+                    limpiarFiltros();
+                }
+            });
+            
+            // Cargar al hacer clic en logo
+            document.querySelector('.app-logo').addEventListener('click', cargarDatos);
+            
+            // Cerrar modales al hacer clic fuera
+            window.onclick = function(event) {
+                if (event.target.classList.contains('modal')) {
+                    event.target.classList.remove('active');
+                }
+            };
+        }
+
+        // 🎯 INICIALIZAR APLICACIÓN
+        window.onload = function() {
+            inicializarEventos();
+            
+            // Establecer fechas por defecto
+            const hoy = new Date();
+            const hace7Dias = new Date();
+            hace7Dias.setDate(hoy.getDate() - 7);
+            
+            document.getElementById('fechaDesde').value = hace7Dias.toISOString().split('T')[0];
+            document.getElementById('fechaHasta').value = hoy.toISOString().split('T')[0];
+            
+            // Inicializar filtros
+            filtrosActivos.fechaDesde = hace7Dias.toISOString().split('T')[0];
+            filtrosActivos.fechaHasta = hoy.toISOString().split('T')[0];
+            
+            // Cargar datos
+            setTimeout(() => {
+                cargarDatos();
+                mostrarNotificacion('🚀 Sistema de monitoreo cargado', 'success', 2000);
+            }, 500);
+        };
+    </script>
+</body>
+</html>

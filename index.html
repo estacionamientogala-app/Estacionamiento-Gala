@@ -1,0 +1,2893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Estacionamiento con Firebase</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* ============ VARIABLES Y RESET ============ */
+        :root {
+            --background: 240 10% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 240 10% 6%;
+            --card-foreground: 0 0% 98%;
+            --primary: 0 84% 60%;
+            --primary-foreground: 0 0% 100%;
+            --secondary: 240 3.7% 15.9%;
+            --secondary-foreground: 0 0% 98%;
+            --muted: 240 3.7% 15.9%;
+            --muted-foreground: 240 5% 64.9%;
+            --accent: 240 3.7% 15.9%;
+            --accent-foreground: 0 0% 98%;
+            --destructive: 142 76% 36%;
+            --destructive-foreground: 0 0% 98%;
+            --border: 240 3.7% 15.9%;
+            --input: 240 3.7% 15.9%;
+            --ring: 0 84% 60%;
+            --radius: 0.75rem;
+            --sidebar: 240 10% 3.9%;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: var(--font-sans);
+        }
+
+        body {
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 28px 28px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ============ LAYOUT PRINCIPAL ============ */
+        .app-wrapper {
+            display: flex;
+            min-height: 100vh;
+            width: 100%;
+        }
+
+        /* ============ SIDEBAR MEJORADA ============ */
+        .sidebar-compact {
+            width: 80px;
+            background: hsl(var(--sidebar));
+            border-right: 1px solid hsl(var(--border));
+            padding: 1.5rem 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            transition: width 0.3s ease;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-compact:hover,
+        .sidebar-compact.expanded {
+            width: 240px;
+            align-items: flex-start;
+            padding: 1.5rem 1rem;
+        }
+
+        .logo-compact {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon-compact {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, hsl(var(--primary)), #f87171);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .logo-text-compact {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, hsl(var(--primary)), #f87171);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            opacity: 0;
+            white-space: nowrap;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-compact:hover .logo-text-compact,
+        .sidebar-compact.expanded .logo-text-compact {
+            opacity: 1;
+        }
+
+        .nav-compact {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+            flex: 1;
+        }
+
+        .nav-btn-compact {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius);
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-btn-compact i {
+            font-size: 1.25rem;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .nav-btn-text {
+            opacity: 0;
+            white-space: nowrap;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-compact:hover .nav-btn-text,
+        .sidebar-compact.expanded .nav-btn-text {
+            opacity: 1;
+        }
+
+        .nav-btn-compact:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+            transform: translateX(4px);
+        }
+
+        .nav-btn-compact.active {
+            background: hsl(var(--primary) / 0.1);
+            color: hsl(var(--primary));
+            border-left: 3px solid hsl(var(--primary));
+        }
+
+        /* ============ CONTENIDO PRINCIPAL ============ */
+        .main-content-compact {
+            flex: 1;
+            margin-left: 80px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        .sidebar-compact:hover ~ .main-content-compact,
+        .sidebar-compact.expanded ~ .main-content-compact {
+            margin-left: 240px;
+        }
+
+        /* ============ HEADER COMPACTO ============ */
+        .header-compact {
+            background: hsl(var(--card));
+            border-bottom: 1px solid hsl(var(--border));
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+            background: hsl(var(--card) / 0.9);
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-title i {
+            color: hsl(var(--primary));
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-indicator {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: hsl(var(--background));
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--border));
+        }
+
+        .online-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+
+        .online-status.online {
+            background: hsl(142 76% 36%);
+        }
+
+        .online-status.offline {
+            background: hsl(0 84% 60%);
+        }
+
+        /* ============ ESTADÍSTICAS COMPACTAS ============ */
+        .stats-grid-compact {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem 1.5rem 0;
+        }
+
+        .stat-card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            border-color: hsl(var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .stat-card:nth-child(1) .stat-icon {
+            background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05));
+            color: hsl(var(--primary));
+        }
+
+        .stat-card:nth-child(2) .stat-icon {
+            background: linear-gradient(135deg, hsl(0 84% 60% / 0.15), hsl(0 84% 60% / 0.05));
+            color: hsl(0 84% 60%);
+        }
+
+        .stat-card:nth-child(3) .stat-icon {
+            background: linear-gradient(135deg, hsl(142 76% 36% / 0.15), hsl(142 76% 36% / 0.05));
+            color: hsl(142 76% 36%);
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: hsl(var(--muted-foreground));
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.375rem;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            color: hsl(var(--foreground));
+            line-height: 1.2;
+        }
+
+        /* ============ ÁREA DE CONTENIDO PRINCIPAL ============ */
+        .content-area-compact {
+            flex: 1;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* ============ FILTROS MEJORADOS ============ */
+        .filters-card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .filters-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+        }
+
+        .filters-title {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: hsl(var(--foreground));
+        }
+
+        .filters-title i {
+            color: hsl(var(--primary));
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .form-group-compact {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-label-compact {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-label-compact i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        .form-input-compact, .form-select-compact {
+            width: 100%;
+            background: hsl(var(--input));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 0.75rem 1rem;
+            color: hsl(var(--foreground));
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .form-input-compact:focus, .form-select-compact:focus {
+            outline: none;
+            border-color: hsl(var(--primary));
+            box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+        }
+
+        .btn-compact {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid transparent;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary-compact {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary-compact:hover {
+            background: hsl(var(--primary) / 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+        }
+
+        .btn-secondary-compact {
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+            border: 1px solid hsl(var(--border));
+        }
+
+        .btn-secondary-compact:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+        }
+
+        /* ============ GRID DE PLAZAS OPTIMIZADO ============ */
+        .parking-container {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .parking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .parking-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: hsl(var(--foreground));
+        }
+
+        .parking-legend {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.75rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-color.libre {
+            background: hsl(142 76% 36%);
+        }
+
+        .legend-color.ocupada {
+            background: hsl(0 84% 60%);
+        }
+
+        .parking-grid-optimized {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .spots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.875rem;
+            padding: 0.25rem;
+            min-height: 200px;
+            position: relative;
+        }
+
+        .spots-grid.skeleton-loading .spot-card {
+            background: linear-gradient(90deg, 
+                hsl(var(--border)) 25%, 
+                hsl(var(--accent) / 0.3) 50%, 
+                hsl(var(--border)) 75%
+            );
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-color: transparent;
+        }
+
+        .spots-grid.skeleton-loading .spot-card * {
+            opacity: 0;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .spot-card {
+            position: relative;
+            height: 110px;
+            background: hsl(var(--card));
+            border: 2px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 4px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            font-family: var(--font-mono);
+        }
+
+        .spot-card:hover {
+            transform: scale(1.03);
+            border-color: hsl(var(--primary));
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        .spot-card.libre {
+            background: hsl(142 76% 36% / 0.05);
+            border-color: hsl(142 76% 36% / 0.3);
+        }
+
+        .spot-card.ocupada {
+            background: hsl(0 84% 60% / 0.05);
+            border-color: hsl(0 84% 60% / 0.4);
+        }
+
+        .spot-number {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: hsl(var(--muted-foreground));
+            background: hsl(var(--background) / 0.8);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .spot-icon {
+            font-size: 1.75rem;
+            margin-bottom: 8px;
+            color: hsl(var(--muted-foreground) / 0.4);
+        }
+
+        .spot-card.ocupada .spot-icon {
+            color: hsl(0 84% 60% / 0.5);
+        }
+
+        .spot-content {
+            text-align: center;
+            padding: 0 0.75rem;
+            width: 100%;
+        }
+
+        .spot-main {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: hsl(var(--foreground));
+            line-height: 1.3;
+            word-break: break-word;
+            margin-bottom: 4px;
+        }
+
+        .spot-plate {
+            font-size: 0.7rem;
+            background: hsl(var(--background) / 0.9);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .spot-status {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            border-radius: 0 0 calc(var(--radius) - 4px) calc(var(--radius) - 4px);
+        }
+
+        .spot-status.libre {
+            background: linear-gradient(90deg, hsl(142 76% 36%), hsl(142 76% 42%));
+        }
+
+        .spot-status.ocupada {
+            background: linear-gradient(90deg, hsl(0 84% 60%), hsl(0 84% 66%));
+        }
+
+        /* ============ MODALES ============ */
+        .modal, .spot-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active, .spot-modal.active {
+            display: flex;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-contenido, .spot-modal-contenido {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) + 4px);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header, .spot-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .modal-title, .spot-modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-title i, .spot-modal-title i {
+            color: hsl(var(--primary));
+        }
+
+        .close-modal, .spot-modal-close {
+            background: transparent;
+            border: none;
+            color: hsl(var(--muted-foreground));
+            font-size: 1.25rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            transition: all 0.2s;
+        }
+
+        .close-modal:hover, .spot-modal-close:hover {
+            background: hsl(var(--muted));
+            color: hsl(var(--foreground));
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-label i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            background: hsl(var(--input));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 0.75rem 1rem;
+            color: hsl(var(--foreground));
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: hsl(var(--primary));
+            box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='hsl(240 5% 64.9%)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 16px;
+            padding-right: 2.5rem;
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid transparent;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary:hover {
+            background: hsl(var(--primary) / 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+        }
+
+        .btn-danger {
+            background: hsl(var(--destructive));
+            color: hsl(var(--destructive-foreground));
+        }
+
+        .btn-danger:hover {
+            background: hsl(var(--destructive) / 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px hsl(var(--destructive) / 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+            border: 1px solid hsl(var(--border));
+        }
+
+        .btn-secondary:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+        }
+
+        .modal-actions, .spot-modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid hsl(var(--border));
+        }
+
+        /* ============ MODAL AUTORIZADOS ============ */
+        .autorizados-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            background: hsl(var(--background));
+        }
+
+        .autorizado-item {
+            padding: 1rem;
+            border-bottom: 1px solid hsl(var(--border));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .autorizado-item:hover {
+            background: hsl(var(--accent) / 0.1);
+        }
+
+        .autorizado-info {
+            flex: 1;
+        }
+
+        .autorizado-nombre {
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            margin-bottom: 0.25rem;
+        }
+
+        .autorizado-details {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .autorizado-patente {
+            background: hsl(var(--primary) / 0.1);
+            color: hsl(var(--primary));
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .autorizado-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .autorizado-status.activo {
+            background: hsl(142 76% 36% / 0.1);
+            color: hsl(142 76% 36%);
+        }
+
+        .autorizado-status.inactivo {
+            background: hsl(0 84% 60% / 0.1);
+            color: hsl(0 84% 60%);
+        }
+
+        /* ============ FILTROS AUTORIZADOS ============ */
+        .filtros-autorizados {
+            background: hsl(var(--background));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .filtro-autorizado-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filtro-autorizado-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filtro-autorizado-label i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        /* ============ HISTORIAL ============ */
+        .filtros-historial {
+            background: hsl(var(--background));
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .filtro-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filtro-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filtro-label i {
+            color: hsl(var(--primary));
+            width: 16px;
+        }
+
+        .historial-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+        }
+
+        .historial-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+        }
+
+        .historial-table th {
+            background: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.75rem;
+            position: sticky;
+            top: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid hsl(var(--border));
+            white-space: nowrap;
+        }
+
+        .historial-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid hsl(var(--border) / 0.5);
+            color: hsl(var(--foreground));
+            white-space: nowrap;
+        }
+
+        .historial-table tr:hover {
+            background: hsl(var(--accent) / 0.1);
+        }
+
+        .historial-ingreso td:first-child {
+            border-left: 3px solid hsl(142 76% 36%);
+        }
+
+        .historial-salida td:first-child {
+            border-left: 3px solid hsl(0 84% 60%);
+        }
+
+        /* ============ DETALLES PLAZA ============ */
+        .spot-details {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-row {
+            display: flex;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid hsl(var(--border) / 0.3);
+        }
+
+        .detail-row:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            min-width: 150px;
+        }
+
+        .detail-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            flex: 1;
+        }
+
+        /* ============ NOTIFICACIONES ============ */
+        .mensaje-rapido {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            z-index: 1001;
+            animation: slideInRight 0.3s ease;
+            display: none;
+            border: 1px solid;
+            backdrop-filter: blur(10px);
+            max-width: 350px;
+        }
+
+        .mensaje-exito {
+            background: hsl(142 76% 36% / 0.15);
+            color: hsl(142 76% 36%);
+            border-color: hsl(142 76% 36% / 0.3);
+        }
+
+        .mensaje-error {
+            background: hsl(0 84% 60% / 0.15);
+            color: hsl(0 84% 60%);
+            border-color: hsl(0 84% 60% / 0.3);
+        }
+
+        .mensaje-info {
+            background: hsl(240 5% 64.9% / 0.15);
+            color: hsl(240 5% 64.9%);
+            border-color: hsl(240 5% 64.9% / 0.3);
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 1200px) {
+            .spots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar-compact {
+                width: 70px;
+                padding: 1.5rem 0.5rem;
+            }
+            
+            .sidebar-compact:hover,
+            .sidebar-compact.expanded {
+                width: 220px;
+            }
+            
+            .main-content-compact {
+                margin-left: 70px;
+            }
+            
+            .sidebar-compact:hover ~ .main-content-compact,
+            .sidebar-compact.expanded ~ .main-content-compact {
+                margin-left: 220px;
+            }
+            
+            .spots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-compact {
+                width: 100%;
+                height: 70px;
+                flex-direction: row;
+                padding: 0 1rem;
+                position: fixed;
+                bottom: 0;
+                top: auto;
+                border-right: none;
+                border-top: 1px solid hsl(var(--border));
+            }
+            
+            .logo-compact {
+                display: none;
+            }
+            
+            .nav-compact {
+                flex-direction: row;
+                justify-content: space-around;
+                gap: 0;
+            }
+            
+            .nav-btn-compact {
+                width: auto;
+                padding: 1rem;
+                justify-content: center;
+            }
+            
+            .nav-btn-text {
+                display: none;
+            }
+            
+            .nav-btn-compact i {
+                font-size: 1.5rem;
+            }
+            
+            .main-content-compact {
+                margin-left: 0;
+                margin-bottom: 70px;
+            }
+            
+            .header-compact {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+            
+            .header-title {
+                font-size: 1.25rem;
+            }
+            
+            .stats-grid-compact {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .content-area-compact {
+                padding: 1rem;
+            }
+            
+            .spots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                gap: 0.75rem;
+            }
+            
+            .spot-card {
+                height: 100px;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-contenido, .spot-modal-contenido {
+                padding: 1.5rem;
+                width: 95%;
+            }
+            
+            .filtros-historial, .filtros-autorizados {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-actions, .spot-modal-actions {
+                flex-direction: column;
+            }
+            
+            .modal-actions .btn,
+            .spot-modal-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .spot-card {
+                height: 90px;
+            }
+            
+            .spots-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 0.5rem;
+            }
+            
+            .stat-card {
+                padding: 1.25rem;
+            }
+            
+            .stat-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 1.25rem;
+            }
+            
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            
+            .modal-contenido, .spot-modal-contenido {
+                padding: 1.25rem;
+                width: 98%;
+            }
+            
+            .modal-title, .spot-modal-title {
+                font-size: 1.125rem;
+            }
+            
+            .detail-row {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            
+            .detail-label {
+                min-width: auto;
+            }
+        }
+
+        /* ============ SCROLLBAR ============ */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: hsl(var(--background));
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: hsl(var(--primary) / 0.4);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: hsl(var(--primary) / 0.6);
+        }
+
+        /* ============ EFECTOS ============ */
+        .glow {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glow::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .glow:hover::before {
+            left: 100%;
+        }
+
+        /* ============ TOOLTIPS ============ */
+        .nav-btn-compact::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: hsl(var(--card));
+            color: hsl(var(--foreground));
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            border: 1px solid hsl(var(--border));
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            pointer-events: none;
+            margin-left: 0.75rem;
+        }
+
+        .nav-btn-compact:hover::after {
+            opacity: 1;
+            visibility: visible;
+            left: calc(100% + 0.5rem);
+        }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR COMPACTA -->
+    <div class="sidebar-compact" id="sidebar">
+        <div class="logo-compact">
+            <div class="logo-icon-compact">
+                <i class="fas fa-parking"></i>
+            </div>
+            <span class="logo-text-compact">Estacionamiento</span>
+        </div>
+        
+        <div class="nav-compact">
+            <button class="nav-btn-compact active" onclick="abrirIngreso()" data-tooltip="Ingresar Auto">
+                <i class="fas fa-plus-circle"></i>
+                <span class="nav-btn-text">Ingresar Auto</span>
+            </button>
+            <button class="nav-btn-compact" onclick="abrirAutorizados()" data-tooltip="Ver Autorizados">
+                <i class="fas fa-user-check"></i>
+                <span class="nav-btn-text">Autorizados</span>
+            </button>
+            <button class="nav-btn-compact" onclick="verHistorial()" data-tooltip="Ver Historial">
+                <i class="fas fa-history"></i>
+                <span class="nav-btn-text">Ver Historial</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content-compact">
+        <!-- HEADER -->
+        <header class="header-compact">
+            <h1 class="header-title">
+                <i class="fas fa-parking"></i>
+                Sistema de Estacionamiento
+            </h1>
+            <div class="header-controls">
+                <div class="status-indicator">
+                    <span class="online-status" id="onlineStatus"></span>
+                    <span id="statusText">Conectando...</span>
+                    | <span id="firebaseStatus">Modo Local</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ESTADÍSTICAS -->
+        <div class="stats-grid-compact">
+            <div class="stat-card glow">
+                <div class="stat-icon">
+                    <i class="fas fa-parking"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Plazas</span>
+                    <div class="stat-value" id="total">57</div>
+                </div>
+            </div>
+            
+            <div class="stat-card glow">
+                <div class="stat-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Ocupadas</span>
+                    <div class="stat-value" id="ocupadas">0</div>
+                </div>
+            </div>
+            
+            <div class="stat-card glow">
+                <div class="stat-icon">
+                    <i class="fas fa-sign"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Libres</span>
+                    <div class="stat-value" id="libres">57</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="content-area-compact">
+            <!-- FILTROS -->
+            <div class="filters-card">
+                <div class="filters-header">
+                    <h3 class="filters-title">
+                        <i class="fas fa-filter"></i>
+                        Filtros de Búsqueda
+                    </h3>
+                </div>
+                
+                <div class="filters-grid">
+                    <div class="form-group-compact">
+                        <label class="form-label-compact">
+                            <i class="fas fa-search"></i>
+                            Buscar
+                        </label>
+                        <input type="text" class="form-input-compact" id="buscar" 
+                               placeholder="Patente, nombre, habitación...">
+                    </div>
+                    
+                    <div class="form-group-compact">
+                        <label class="form-label-compact">
+                            <i class="fas fa-filter"></i>
+                            Estado
+                        </label>
+                        <select class="form-select-compact" id="filtroEstado">
+                            <option value="todos">Todos</option>
+                            <option value="ocupadas">Solo Ocupadas</option>
+                            <option value="libres">Solo Libres</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group-compact" style="align-self: flex-end;">
+                        <button class="btn-compact btn-primary-compact" onclick="filtrarPlazas()">
+                            <i class="fas fa-filter"></i>
+                            Aplicar Filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRID DE PLAZAS -->
+            <div class="parking-container">
+                <div class="parking-header">
+                    <h3 class="parking-title">Plazas de Estacionamiento</h3>
+                    <div class="parking-legend">
+                        <div class="legend-item">
+                            <div class="legend-color libre"></div>
+                            <span>Libre</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color ocupada"></div>
+                            <span>Ocupada</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="parking-grid-optimized">
+                    <div class="spots-grid" id="parkingGrid">
+                        <!-- Las 57 plazas se generan dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE DETALLES DE PLAZA -->
+    <div class="spot-modal" id="spotModal">
+        <div class="spot-modal-contenido">
+            <div class="spot-modal-header">
+                <h3 class="spot-modal-title" id="spotModalTitle">
+                    <i class="fas fa-info-circle"></i>
+                    Detalles de la Plaza
+                </h3>
+                <button class="spot-modal-close" onclick="cerrarSpotModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="spot-details" id="spotDetails">
+                <!-- Los detalles se cargan dinámicamente -->
+            </div>
+            
+            <div class="form-group" id="numeroPlazaEstContainer" style="display: none;">
+                <label class="form-label">
+                    <i class="fas fa-hashtag"></i>
+                    Número de Plaza (Estacionamiento)
+                </label>
+                <input type="text" class="form-input" id="numeroPlazaEstModal" placeholder="Ej: A-15, B-08, C-22">
+                <small style="color: hsl(var(--muted-foreground)); font-size: 0.75rem; display: block; margin-top: 0.25rem;">
+                    Número real de la plaza en el estacionamiento físico
+                </small>
+                <button class="btn btn-primary" onclick="guardarNumeroPlazaEst()" style="margin-top: 0.5rem;">
+                    <i class="fas fa-save"></i>
+                    Guardar Número de Plaza
+                </button>
+            </div>
+            
+            <div class="spot-modal-actions">
+                <button class="btn btn-secondary" onclick="cerrarSpotModal()">
+                    <i class="fas fa-times"></i>
+                    Cerrar
+                </button>
+                <button class="btn btn-danger" id="btnSalida" onclick="salidaDesdeModal()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Salida
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL INGRESO -->
+    <div class="modal" id="modalIngreso">
+        <div class="modal-contenido">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-plus-circle"></i>
+                    Ingresar Auto
+                </h3>
+                <button class="close-modal" onclick="cerrarModal('modalIngreso')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-car"></i>
+                    Tipo de auto
+                </label>
+                <select class="form-select" id="tipoAuto">
+                    <option value="">Seleccionar tipo (opcional)</option>
+                    <option value="Auto">Auto</option>
+                    <option value="Camioneta">Camioneta</option>
+                    <option value="Moto">Moto</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-users"></i>
+                    Tipo de cliente
+                </label>
+                <select class="form-select" id="tipoCliente">
+                    <option value="">Seleccionar tipo de cliente (opcional)</option>
+                    <option value="Cliente de hotel">Cliente de hotel</option>
+                    <option value="Cliente de casino">Cliente de casino</option>
+                    <option value="Personal">Personal</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user"></i>
+                    Nombre
+                </label>
+                <input type="text" class="form-input" id="nombreIngreso" placeholder="Nombre del cliente (opcional)">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-id-card"></i>
+                    Patente
+                </label>
+                <input type="text" class="form-input" id="patenteIngreso" 
+                       placeholder="Ej: ABC123 (opcional)"
+                       oninput="verificarAutorizado(this.value)">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-door-open"></i>
+                    Habitación
+                </label>
+                <input type="text" class="form-input" id="habitacionIngreso" placeholder="Ej: 101 (opcional)">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-sticky-note"></i>
+                    Observaciones
+                </label>
+                <textarea class="form-textarea" id="observacionesIngreso" placeholder="Detalles del cliente, veces que vino, etc. (opcional)"></textarea>
+            </div>
+
+            <div id="autorizadoInfo" style="display: none; background: hsl(142 76% 36% / 0.1); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem; border-left: 4px solid hsl(142 76% 36%);">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <i class="fas fa-user-check" style="color: hsl(142 76% 36%);"></i>
+                    <strong style="color: hsl(142 76% 36%);">AUTORIZADO DETECTADO</strong>
+                </div>
+                <div id="autorizadoDetalles" style="font-size: 0.875rem;">
+                    <!-- Detalles del autorizado se llenan automáticamente -->
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="cerrarModal('modalIngreso')">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button class="btn btn-primary" id="btnIngresar" onclick="ingresarAuto()">
+                    <i class="fas fa-check"></i>
+                    Ingresar Auto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AUTORIZADOS CON FILTROS MEJORADOS -->
+    <div class="modal" id="modalAutorizados">
+        <div class="modal-contenido" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-user-check"></i>
+                    Personas Autorizadas
+                </h3>
+                <button class="close-modal" onclick="cerrarModal('modalAutorizados')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- FILTROS DE AUTORIZADOS -->
+            <div class="filtros-autorizados">
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-id-card"></i>
+                        Patente
+                    </label>
+                    <input type="text" class="form-input" id="filtroPatenteAutorizados" 
+                           placeholder="Filtrar por patente" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-user"></i>
+                        Nombre
+                    </label>
+                    <input type="text" class="form-input" id="filtroNombreAutorizados" 
+                           placeholder="Filtrar por nombre" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-building"></i>
+                        Empresa
+                    </label>
+                    <input type="text" class="form-input" id="filtroEmpresaAutorizados" 
+                           placeholder="Filtrar por empresa" 
+                           onkeyup="filtrarAutorizados()">
+                </div>
+                
+                <div class="filtro-autorizado-group">
+                    <label class="filtro-autorizado-label">
+                        <i class="fas fa-filter"></i>
+                        Estado
+                    </label>
+                    <select class="form-select" id="filtroEstadoAutorizados" onchange="filtrarAutorizados()">
+                        <option value="todos">Todos los estados</option>
+                        <option value="activo">Solo activos</option>
+                        <option value="inactivo">Solo inactivos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: hsl(var(--muted-foreground)); font-weight: 600;">
+                    <i class="fas fa-users"></i>
+                    Total: <span id="contadorAutorizados">0</span> autorizados
+                </span>
+                <button class="btn btn-secondary" onclick="resetearFiltrosAutorizados()">
+                    <i class="fas fa-redo"></i>
+                    Limpiar Filtros
+                </button>
+            </div>
+
+            <div class="autorizados-list" id="listaAutorizados">
+                <!-- Lista cargada dinámicamente -->
+                <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div>Cargando autorizados...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL SIMPLIFICADO -->
+    <div class="modal" id="modalHistorial">
+        <div class="modal-contenido" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-history"></i>
+                    Historial Completo
+                </h3>
+                <button class="close-modal" onclick="cerrarModal('modalHistorial')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- FILTROS SIMPLIFICADOS: Solo patente y tipo cliente -->
+            <div class="filtros-historial">
+                <div class="filtro-group">
+                    <label class="filtro-label">
+                        <i class="fas fa-id-card"></i>
+                        Patente
+                    </label>
+                    <input type="text" class="form-input" id="filtroPatente" placeholder="Filtrar por patente">
+                </div>
+                
+                <div class="filtro-group">
+                    <label class="filtro-label">
+                        <i class="fas fa-users"></i>
+                        Tipo de Cliente
+                    </label>
+                    <select class="form-select" id="filtroTipoCliente">
+                        <option value="">Todos los tipos</option>
+                        <option value="Cliente de hotel">Cliente de hotel</option>
+                        <option value="Cliente de casino">Cliente de casino</option>
+                        <option value="Personal">Personal</option>
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="align-self: flex-end;">
+                    <button class="btn btn-primary" onclick="aplicarFiltrosHistorial()" style="width: 100%;">
+                        <i class="fas fa-filter"></i>
+                        Filtrar
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin: 1rem 0; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: hsl(var(--muted-foreground)); font-weight: 600;">
+                    <i class="fas fa-list"></i>
+                    Registros: <span id="contadorHistorial">0</span>
+                </span>
+                <button class="btn btn-primary" onclick="exportarHistorialExcel()">
+                    <i class="fas fa-file-export"></i>
+                    Exportar Historial
+                </button>
+            </div>
+            
+            <!-- TABLA DE HISTORIAL -->
+            <div class="historial-table-container">
+                <table class="historial-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Acción</th>
+                            <th>Plaza</th>
+                            <th>N° Plaza Est</th>
+                            <th>Patente</th>
+                            <th>Tipo Cliente</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historialBody">
+                        <!-- Filas cargadas dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICACIÓN -->
+    <div id="mensajeRapido" class="mensaje-rapido"></div>
+
+    <script>
+        // ============ CONFIGURACIÓN FIREBASE ============
+        // ⚠️ REEMPLAZA ESTAS CREDENCIALES CON LAS TUS ⚠️
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAeF1euvJ_-GEhXyxmcoXMsugeKjA4VRM",
+            authDomain: "estacionamiento-gala.firebaseapp.com",
+            projectId: "estacionamiento-gala",
+            storageBucket: "estacionamiento-gala.firebasestorage.app",
+            messagingSenderId: "19666484948",
+            appId: "1:19666484948:web:1a33118a8040ba9815c541"
+        };const firebaseConfig = {
+  
+
+        // Inicializar Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            
+            // Habilitar persistencia offline
+            db.enablePersistence()
+                .then(() => {
+                    console.log("✅ Persistencia offline activada");
+                })
+                .catch((err) => {
+                    console.warn("⚠️ Persistencia no disponible:", err);
+                });
+            
+        } catch (error) {
+            console.error("❌ Error al inicializar Firebase:", error);
+        }
+
+        // ============ CONSTANTES ============
+        const CONSTANTS = {
+            TOTAL_PLAZAS: 57,
+            DEBOUNCE_TIME: 300
+        };
+
+        // ============ DATOS ============
+        let datos = {
+            plazas: [],
+            historial: [],
+            autorizados: [],
+            plazaMap: {},
+            plazaSeleccionada: null,
+            modoFirebase: false
+        };
+
+        // ============ INICIALIZAR SISTEMA ============
+        async function inicializarSistema() {
+            console.log("🚀 Iniciando sistema de estacionamiento...");
+            
+            // Verificar si Firebase está configurado correctamente
+            if (db) {
+                try {
+                    // Probar conexión a Firebase
+                    await db.collection('test').limit(1).get();
+                    datos.modoFirebase = true;
+                    document.getElementById('firebaseStatus').textContent = 'Firebase: Conectado';
+                    document.getElementById('firebaseStatus').style.color = 'hsl(142 76% 36%)';
+                    
+                    console.log("✅ Firebase configurado correctamente");
+                    await inicializarConFirebase();
+                    
+                } catch (error) {
+                    console.warn("⚠️ Firebase no configurado, usando modo local:", error.message);
+                    datos.modoFirebase = false;
+                    document.getElementById('firebaseStatus').textContent = 'Modo Local (sin Firebase)';
+                    document.getElementById('firebaseStatus').style.color = 'hsl(0 84% 60%)';
+                    inicializarModoLocal();
+                }
+            } else {
+                console.log("📱 Usando modo local (Firebase no inicializado)");
+                datos.modoFirebase = false;
+                document.getElementById('firebaseStatus').textContent = 'Modo Local';
+                document.getElementById('firebaseStatus').style.color = 'hsl(0 84% 60%)';
+                inicializarModoLocal();
+            }
+            
+            // Inicializar UI común
+            inicializarPlazasVacias();
+            crearParkingGrid();
+            actualizarEstadisticas();
+            mostrarMensajeRapido('✅ Sistema cargado correctamente', 'exito');
+        }
+
+        // ============ INICIALIZAR CON FIREBASE ============
+        async function inicializarConFirebase() {
+            console.log("🔥 Inicializando con Firebase...");
+            
+            // Escuchar plazas en tiempo real
+            db.collection('plazas')
+                .orderBy('numero')
+                .onSnapshot((snapshot) => {
+                    if (snapshot.empty) {
+                        console.log("🔄 No hay plazas, creando estructura inicial...");
+                        crearPlazasFirebase();
+                        return;
+                    }
+                    
+                    datos.plazas = [];
+                    datos.plazaMap = {};
+                    
+                    snapshot.forEach((doc) => {
+                        const plaza = { 
+                            id: doc.id, 
+                            numero: doc.data().numero,
+                            ocupada: doc.data().ocupada || false,
+                            numeroPlazaEst: doc.data().numeroPlazaEst || "",
+                            patente: doc.data().patente || "",
+                            nombre: doc.data().nombre || "",
+                            habitacion: doc.data().habitacion || "",
+                            tipo: doc.data().tipo || "",
+                            tipoCliente: doc.data().tipoCliente || "",
+                            observaciones: doc.data().observaciones || "",
+                            ingreso: doc.data().ingreso || null
+                        };
+                        datos.plazas.push(plaza);
+                        datos.plazaMap[plaza.numero] = plaza;
+                    });
+                    
+                    console.log(`✅ ${datos.plazas.length} plazas cargadas de Firebase`);
+                    actualizarEstadisticas();
+                    crearParkingGrid();
+                    
+                }, (error) => {
+                    console.error("❌ Error al cargar plazas:", error);
+                    mostrarMensajeRapido('⚠️ Error al cargar plazas, usando modo local', 'error');
+                    inicializarModoLocal();
+                });
+            
+            // Escuchar historial
+            db.collection('movimientos')
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .onSnapshot((snapshot) => {
+                    datos.historial = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            fechaLegible: data.timestamp ? formatearFechaHora(data.timestamp.toDate()) : data.fechaLegible || ''
+                        };
+                    });
+                    console.log(`📊 Historial actualizado: ${datos.historial.length} registros`);
+                }, (error) => {
+                    console.error("❌ Error al cargar historial:", error);
+                });
+            
+            // Cargar autorizados
+            await cargarAutorizadosFirebase();
+        }
+
+        async function crearPlazasFirebase() {
+            console.log("🔄 Creando estructura de plazas en Firebase...");
+            
+            try {
+                const batch = db.batch();
+                
+                for (let i = 1; i <= CONSTANTS.TOTAL_PLAZAS; i++) {
+                    const plazaRef = db.collection('plazas').doc(`plaza_${i}`);
+                    batch.set(plazaRef, {
+                        numero: i,
+                        estado: 'libre',
+                        ocupada: false,
+                        numeroPlazaEst: "",
+                        patente: "",
+                        nombre: "",
+                        habitacion: "",
+                        tipo: "",
+                        tipoCliente: "",
+                        observaciones: "",
+                        ingreso: null,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                await batch.commit();
+                console.log(`✅ ${CONSTANTS.TOTAL_PLAZAS} plazas creadas en Firebase`);
+                
+            } catch (error) {
+                console.error("❌ Error al crear plazas en Firebase:", error);
+                mostrarMensajeRapido('❌ Error al crear plazas', 'error');
+            }
+        }
+
+        async function cargarAutorizadosFirebase() {
+            try {
+                const snapshot = await db.collection('autorizados').get();
+                datos.autorizados = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                console.log(`✅ ${datos.autorizados.length} autorizados cargados de Firebase`);
+                
+            } catch (error) {
+                console.error("❌ Error al cargar autorizados:", error);
+                datos.autorizados = [];
+            }
+        }
+
+        // ============ INICIALIZAR MODO LOCAL ============
+        function inicializarModoLocal() {
+            console.log("📱 Iniciando en modo local...");
+            
+            // Cargar datos de localStorage si existen
+            cargarDesdeLocalStorage();
+            
+            // Datos de ejemplo para autorizados (se reemplazarán con Firebase)
+            if (datos.autorizados.length === 0) {
+                datos.autorizados = [
+                    {
+                        id: '1',
+                        nombre: 'Juan Pérez',
+                        patente: 'ABC123',
+                        empresa: 'Empresa Ejemplo S.A.',
+                        habitacion: '101',
+                        tipoCliente: 'Cliente de hotel',
+                        observaciones: 'Cliente frecuente',
+                        activo: true
+                    },
+                    {
+                        id: '2',
+                        nombre: 'María Gómez',
+                        patente: 'XYZ789',
+                        empresa: 'Otra Empresa',
+                        habitacion: '205',
+                        tipoCliente: 'Cliente de casino',
+                        observaciones: 'VIP',
+                        activo: true
+                    },
+                    {
+                        id: '3',
+                        nombre: 'Carlos Rodríguez',
+                        patente: 'DEF456',
+                        empresa: 'Constructora XYZ',
+                        habitacion: '150',
+                        tipoCliente: 'Personal',
+                        observaciones: 'Contratista',
+                        activo: false
+                    }
+                ];
+                console.log(`✅ ${datos.autorizados.length} autorizados de ejemplo cargados`);
+            }
+        }
+
+        function inicializarPlazasVacias() {
+            datos.plazas = [];
+            datos.plazaMap = {};
+            
+            for (let i = 1; i <= CONSTANTS.TOTAL_PLAZAS; i++) {
+                const plaza = {
+                    id: `plaza_${i}`,
+                    numero: i,
+                    estado: 'libre',
+                    ocupada: false,
+                    numeroPlazaEst: "",
+                    patente: "",
+                    nombre: "",
+                    habitacion: "",
+                    tipo: "",
+                    tipoCliente: "",
+                    observaciones: "",
+                    ingreso: null
+                };
+                datos.plazas.push(plaza);
+                datos.plazaMap[i] = plaza;
+            }
+        }
+
+        function cargarDesdeLocalStorage() {
+            try {
+                // Cargar historial
+                const historialGuardado = localStorage.getItem('estacionamiento_historial');
+                if (historialGuardado) {
+                    datos.historial = JSON.parse(historialGuardado);
+                    console.log(`📊 Historial cargado de localStorage: ${datos.historial.length} registros`);
+                }
+                
+                // Cargar estado de plazas
+                const plazasGuardadas = localStorage.getItem('estacionamiento_plazas');
+                if (plazasGuardadas) {
+                    const plazasData = JSON.parse(plazasGuardadas);
+                    plazasData.forEach(plazaData => {
+                        if (datos.plazaMap[plazaData.numero]) {
+                            Object.assign(datos.plazaMap[plazaData.numero], plazaData);
+                        }
+                    });
+                    console.log("✅ Estado de plazas cargado de localStorage");
+                }
+                
+                // Cargar autorizados
+                const autorizadosGuardados = localStorage.getItem('estacionamiento_autorizados');
+                if (autorizadosGuardados) {
+                    datos.autorizados = JSON.parse(autorizadosGuardados);
+                    console.log(`✅ ${datos.autorizados.length} autorizados cargados de localStorage`);
+                }
+                
+            } catch (error) {
+                console.error("❌ Error al cargar de localStorage:", error);
+            }
+        }
+
+        function guardarEnLocalStorage() {
+            try {
+                // Guardar historial
+                localStorage.setItem('estacionamiento_historial', JSON.stringify(datos.historial));
+                
+                // Guardar estado de plazas
+                const plazasParaGuardar = datos.plazas.map(p => ({
+                    numero: p.numero,
+                    ocupada: p.ocupada,
+                    numeroPlazaEst: p.numeroPlazaEst,
+                    patente: p.patente,
+                    nombre: p.nombre,
+                    habitacion: p.habitacion,
+                    tipo: p.tipo,
+                    tipoCliente: p.tipoCliente,
+                    observaciones: p.observaciones,
+                    ingreso: p.ingreso
+                }));
+                localStorage.setItem('estacionamiento_plazas', JSON.stringify(plazasParaGuardar));
+                
+                // Guardar autorizados
+                localStorage.setItem('estacionamiento_autorizados', JSON.stringify(datos.autorizados));
+                
+            } catch (error) {
+                console.error("❌ Error al guardar en localStorage:", error);
+            }
+        }
+
+        // ============ FUNCIONES UTILIDAD ============
+        function formatearFechaHora(fecha) {
+            if (!fecha) return '';
+            try {
+                const fechaObj = fecha instanceof Date ? fecha : fecha.toDate ? fecha.toDate() : new Date(fecha);
+                if (isNaN(fechaObj.getTime())) return '';
+                return fechaObj.toLocaleString("es-AR", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false
+                });
+            } catch {
+                return '';
+            }
+        }
+
+        function mostrarMensajeRapido(mensaje, tipo = 'exito') {
+            const mensajeDiv = document.getElementById('mensajeRapido');
+            mensajeDiv.textContent = mensaje;
+            mensajeDiv.className = `mensaje-rapido mensaje-${tipo}`;
+            mensajeDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                mensajeDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // ============ GRID DE PLAZAS ============
+        function crearParkingGrid() {
+            const grid = document.getElementById('parkingGrid');
+            if (!grid) return;
+            
+            grid.innerHTML = '';
+            
+            for (let i = 1; i <= CONSTANTS.TOTAL_PLAZAS; i++) {
+                const plaza = datos.plazaMap[i] || {
+                    numero: i,
+                    ocupada: false,
+                    numeroPlazaEst: "",
+                    patente: "",
+                    nombre: "",
+                    habitacion: "",
+                    tipo: "",
+                    tipoCliente: "",
+                    observaciones: "",
+                    ingreso: null
+                };
+                
+                let icono = 'fa-car';
+                if (plaza.tipo === 'Moto') icono = 'fa-motorcycle';
+                if (plaza.tipo === 'Camioneta') icono = 'fa-truck';
+                
+                const spot = document.createElement('div');
+                spot.className = `spot-card ${plaza.ocupada ? 'ocupada' : 'libre'}`;
+                spot.dataset.numero = i;
+                
+                let textoMostrar = `Plaza ${i}`;
+                if (plaza.ocupada && plaza.numeroPlazaEst) {
+                    textoMostrar = plaza.numeroPlazaEst;
+                }
+                
+                spot.innerHTML = `
+                    <div class="spot-number">${i}</div>
+                    <div class="spot-icon">
+                        <i class="fas ${plaza.ocupada ? icono : 'fa-parking'}"></i>
+                    </div>
+                    <div class="spot-content">
+                        <div class="spot-main">
+                            ${textoMostrar}
+                        </div>
+                        ${plaza.ocupada && plaza.patente ? `<div class="spot-plate">${plaza.patente}</div>` : ''}
+                    </div>
+                    <div class="spot-status ${plaza.ocupada ? 'ocupada' : 'libre'}"></div>
+                `;
+                
+                spot.addEventListener('click', () => {
+                    mostrarDetallesPlaza(plaza);
+                });
+                
+                grid.appendChild(spot);
+            }
+            
+            console.log(`✅ Grid creado: ${CONSTANTS.TOTAL_PLAZAS} plazas`);
+        }
+
+        // ============ DETALLES PLAZA ============
+        function mostrarDetallesPlaza(plaza) {
+            datos.plazaSeleccionada = plaza;
+            
+            document.getElementById('spotModalTitle').innerHTML = `
+                <i class="fas fa-info-circle"></i>
+                Plaza ${plaza.numero}
+                ${plaza.numeroPlazaEst ? `(${plaza.numeroPlazaEst})` : ''}
+            `;
+            
+            const detalles = document.getElementById('spotDetails');
+            
+            if (plaza.ocupada) {
+                detalles.innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Estado:</div>
+                        <div class="detail-value" style="color: hsl(0 84% 60%); font-weight: 700;">OCUPADA</div>
+                    </div>
+                    ${plaza.numeroPlazaEst ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Número Plaza (Est):</div>
+                        <div class="detail-value">${plaza.numeroPlazaEst}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.patente ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Patente:</div>
+                        <div class="detail-value">${plaza.patente}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.nombre ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Nombre:</div>
+                        <div class="detail-value">${plaza.nombre}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.habitacion ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Habitación:</div>
+                        <div class="detail-value">${plaza.habitacion}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.tipo ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Tipo de Auto:</div>
+                        <div class="detail-value">${plaza.tipo}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.tipoCliente ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Tipo de Cliente:</div>
+                        <div class="detail-value">${plaza.tipoCliente}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.observaciones ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Observaciones:</div>
+                        <div class="detail-value">${plaza.observaciones}</div>
+                    </div>
+                    ` : ''}
+                    ${plaza.ingreso ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Hora de Ingreso:</div>
+                        <div class="detail-value">${formatearFechaHora(plaza.ingreso)}</div>
+                    </div>
+                    ` : ''}
+                `;
+                
+                document.getElementById('numeroPlazaEstModal').value = plaza.numeroPlazaEst || '';
+                document.getElementById('numeroPlazaEstContainer').style.display = 'block';
+                document.getElementById('btnSalida').style.display = 'inline-flex';
+            } else {
+                detalles.innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Estado:</div>
+                        <div class="detail-value" style="color: hsl(142 76% 36%); font-weight: 700;">LIBRE</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Disponible para ingresar</div>
+                        <div class="detail-value">Haz clic en "Ingresar Auto" en la barra lateral</div>
+                    </div>
+                `;
+                document.getElementById('numeroPlazaEstContainer').style.display = 'none';
+                document.getElementById('btnSalida').style.display = 'none';
+            }
+            
+            document.getElementById('spotModal').classList.add('active');
+        }
+
+        function cerrarSpotModal() {
+            document.getElementById('spotModal').classList.remove('active');
+            datos.plazaSeleccionada = null;
+        }
+
+        // ============ VERIFICAR AUTORIZADO (EN INGRESO) ============
+        function verificarAutorizado(patente) {
+            const patenteLimpia = patente.trim().toUpperCase();
+            if (patenteLimpia.length < 3) {
+                document.getElementById('autorizadoInfo').style.display = 'none';
+                return;
+            }
+            
+            const autorizado = datos.autorizados.find(a => 
+                a.patente && a.patente.toUpperCase() === patenteLimpia && a.activo === true
+            );
+            
+            if (autorizado) {
+                document.getElementById('autorizadoInfo').style.display = 'block';
+                document.getElementById('autorizadoDetalles').innerHTML = `
+                    <div><strong>Nombre:</strong> ${autorizado.nombre || 'No especificado'}</div>
+                    <div><strong>Empresa:</strong> ${autorizado.empresa || 'No especificada'}</div>
+                    <div><strong>Habitación:</strong> ${autorizado.habitacion || 'No especificada'}</div>
+                    <div><strong>Tipo Cliente:</strong> ${autorizado.tipoCliente || 'No especificado'}</div>
+                    ${autorizado.observaciones ? `<div><strong>Observaciones:</strong> ${autorizado.observaciones}</div>` : ''}
+                `;
+                
+                // Autocompletar campos
+                if (autorizado.nombre) {
+                    document.getElementById('nombreIngreso').value = autorizado.nombre;
+                }
+                if (autorizado.habitacion) {
+                    document.getElementById('habitacionIngreso').value = autorizado.habitacion;
+                }
+                if (autorizado.tipoCliente) {
+                    document.getElementById('tipoCliente').value = autorizado.tipoCliente;
+                }
+                if (autorizado.observaciones) {
+                    document.getElementById('observacionesIngreso').value = autorizado.observaciones;
+                }
+                
+                mostrarMensajeRapido('✅ Vehículo autorizado detectado', 'exito');
+            } else {
+                document.getElementById('autorizadoInfo').style.display = 'none';
+            }
+        }
+
+        // ============ MODAL AUTORIZADOS CON FILTROS ============
+        function abrirAutorizados() {
+            document.getElementById('modalAutorizados').classList.add('active');
+            mostrarAutorizados();
+        }
+
+        function mostrarAutorizados() {
+            const lista = document.getElementById('listaAutorizados');
+            const contador = document.getElementById('contadorAutorizados');
+            
+            if (datos.autorizados.length === 0) {
+                lista.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                        <i class="fas fa-user-slash" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <div>No hay personas autorizadas registradas</div>
+                        ${!datos.modoFirebase ? `<small style="margin-top: 0.5rem; display: block;">
+                            Configura Firebase para cargar autorizados desde la base de datos
+                        </small>` : ''}
+                    </div>
+                `;
+                contador.textContent = '0';
+                return;
+            }
+            
+            // Aplicar filtros iniciales
+            filtrarAutorizados();
+        }
+
+        function filtrarAutorizados() {
+            const lista = document.getElementById('listaAutorizados');
+            const contador = document.getElementById('contadorAutorizados');
+            
+            // Obtener valores de filtros
+            const filtroPatente = document.getElementById('filtroPatenteAutorizados').value.toLowerCase();
+            const filtroNombre = document.getElementById('filtroNombreAutorizados').value.toLowerCase();
+            const filtroEmpresa = document.getElementById('filtroEmpresaAutorizados').value.toLowerCase();
+            const filtroEstado = document.getElementById('filtroEstadoAutorizados').value;
+            
+            // Filtrar autorizados
+            let autorizadosFiltrados = datos.autorizados;
+            
+            if (filtroPatente) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.patente && a.patente.toLowerCase().includes(filtroPatente)
+                );
+            }
+            
+            if (filtroNombre) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.nombre && a.nombre.toLowerCase().includes(filtroNombre)
+                );
+            }
+            
+            if (filtroEmpresa) {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => 
+                    a.empresa && a.empresa.toLowerCase().includes(filtroEmpresa)
+                );
+            }
+            
+            if (filtroEstado === 'activo') {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => a.activo === true);
+            } else if (filtroEstado === 'inactivo') {
+                autorizadosFiltrados = autorizadosFiltrados.filter(a => a.activo === false);
+            }
+            
+            // Actualizar contador
+            contador.textContent = autorizadosFiltrados.length;
+            
+            if (autorizadosFiltrados.length === 0) {
+                lista.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">
+                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <div>No se encontraron autorizados con los filtros aplicados</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Ordenar por nombre
+            autorizadosFiltrados.sort((a, b) => {
+                const nombreA = a.nombre || '';
+                const nombreB = b.nombre || '';
+                return nombreA.localeCompare(nombreB);
+            });
+            
+            // Generar HTML
+            let html = '';
+            autorizadosFiltrados.forEach(autorizado => {
+                html += `
+                    <div class="autorizado-item" data-patente="${autorizado.patente || ''}">
+                        <div class="autorizado-info">
+                            <div class="autorizado-nombre">${autorizado.nombre || 'Sin nombre'}</div>
+                            <div class="autorizado-details">
+                                <span class="autorizado-patente">${autorizado.patente || 'Sin patente'}</span>
+                                <span>${autorizado.empresa || 'Sin empresa'}</span>
+                                <span>Hab: ${autorizado.habitacion || 'N/A'}</span>
+                                <span>${autorizado.tipoCliente || 'Sin tipo'}</span>
+                            </div>
+                        </div>
+                        <div class="autorizado-status ${autorizado.activo ? 'activo' : 'inactivo'}">
+                            ${autorizado.activo ? 'ACTIVO' : 'INACTIVO'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            lista.innerHTML = html;
+        }
+
+        function resetearFiltrosAutorizados() {
+            document.getElementById('filtroPatenteAutorizados').value = '';
+            document.getElementById('filtroNombreAutorizados').value = '';
+            document.getElementById('filtroEmpresaAutorizados').value = '';
+            document.getElementById('filtroEstadoAutorizados').value = 'todos';
+            
+            filtrarAutorizados();
+            mostrarMensajeRapido('✅ Filtros restablecidos', 'exito');
+        }
+
+        // ============ INGRESAR AUTO ============
+        async function ingresarAuto() {
+            const btn = document.getElementById('btnIngresar');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+            
+            try {
+                const tipoAuto = document.getElementById('tipoAuto').value;
+                const tipoCliente = document.getElementById('tipoCliente').value;
+                const nombre = document.getElementById('nombreIngreso').value;
+                const patente = document.getElementById('patenteIngreso').value;
+                const habitacion = document.getElementById('habitacionIngreso').value;
+                const observaciones = document.getElementById('observacionesIngreso').value;
+                
+                // Encontrar primera plaza libre
+                const plazaLibre = datos.plazas.find(p => !p.ocupada);
+                if (!plazaLibre) {
+                    mostrarMensajeRapido('❌ No hay plazas libres', 'error');
+                    return;
+                }
+                
+                const fechaActual = new Date();
+                
+                // Actualizar plaza localmente
+                plazaLibre.ocupada = true;
+                plazaLibre.patente = patente ? patente.toUpperCase() : "";
+                plazaLibre.nombre = nombre;
+                plazaLibre.habitacion = habitacion;
+                plazaLibre.tipo = tipoAuto;
+                plazaLibre.tipoCliente = tipoCliente;
+                plazaLibre.observaciones = observaciones;
+                plazaLibre.ingreso = fechaActual;
+                plazaLibre.estado = 'ocupada';
+                
+                // Crear movimiento
+                const movimiento = {
+                    id: 'mov_' + Date.now(),
+                    tipo: 'INGRESO',
+                    plaza: plazaLibre.numero,
+                    numeroPlazaEst: "",
+                    patente: plazaLibre.patente,
+                    nombre: nombre,
+                    habitacion: habitacion,
+                    tipoAuto: tipoAuto,
+                    tipoCliente: tipoCliente,
+                    observaciones: observaciones,
+                    fecha: fechaActual.toISOString(),
+                    fechaLegible: formatearFechaHora(fechaActual),
+                    timestamp: fechaActual
+                };
+                
+                // Agregar al historial
+                datos.historial.unshift(movimiento);
+                
+                // Guardar según el modo
+                if (datos.modoFirebase) {
+                    await ingresarAutoFirebase(plazaLibre, movimiento);
+                } else {
+                    guardarEnLocalStorage();
+                    mostrarMensajeRapido('💾 Guardado localmente', 'info');
+                }
+                
+                // Actualizar UI
+                actualizarEstadisticas();
+                crearParkingGrid();
+                mostrarMensajeRapido(`✅ Auto ingresado en plaza ${plazaLibre.numero}`, 'exito');
+                cerrarModal('modalIngreso');
+                
+                // Limpiar formulario
+                document.getElementById('autorizadoInfo').style.display = 'none';
+                document.getElementById('patenteIngreso').value = '';
+                document.getElementById('nombreIngreso').value = '';
+                document.getElementById('habitacionIngreso').value = '';
+                document.getElementById('observacionesIngreso').value = '';
+                
+            } catch (error) {
+                console.error("❌ Error al ingresar auto:", error);
+                mostrarMensajeRapido('❌ Error al ingresar auto', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function ingresarAutoFirebase(plaza, movimiento) {
+            try {
+                // Actualizar plaza en Firestore
+                await db.collection('plazas').doc(`plaza_${plaza.numero}`).update({
+                    estado: 'ocupada',
+                    ocupada: true,
+                    patente: movimiento.patente,
+                    nombre: movimiento.nombre,
+                    habitacion: movimiento.habitacion,
+                    tipo: movimiento.tipoAuto,
+                    tipoCliente: movimiento.tipoCliente,
+                    observaciones: movimiento.observaciones,
+                    ingreso: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Guardar movimiento
+                await db.collection('movimientos').add({
+                    ...movimiento,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log(`✅ Ingreso guardado en Firebase: Plaza ${plaza.numero}`);
+                
+            } catch (error) {
+                console.error("❌ Error al guardar en Firebase:", error);
+                throw error;
+            }
+        }
+
+        // ============ SALIDA ============
+        async function salidaDesdeModal() {
+            if (!datos.plazaSeleccionada || !datos.plazaSeleccionada.ocupada) return;
+            
+            await registrarSalidaPlaza(datos.plazaSeleccionada.numero);
+            cerrarSpotModal();
+        }
+
+        async function registrarSalidaPlaza(plazaNum) {
+            const plaza = datos.plazaMap[plazaNum];
+            if (!plaza || !plaza.ocupada) return;
+            
+            const fechaActual = new Date();
+            
+            // Crear movimiento de salida
+            const movimiento = {
+                id: 'mov_' + Date.now(),
+                tipo: 'SALIDA',
+                plaza: plaza.numero,
+                numeroPlazaEst: plaza.numeroPlazaEst || "",
+                patente: plaza.patente || "",
+                nombre: plaza.nombre || "",
+                habitacion: plaza.habitacion || "",
+                tipoAuto: plaza.tipo || "",
+                tipoCliente: plaza.tipoCliente || "",
+                observaciones: plaza.observaciones || "",
+                fecha: fechaActual.toISOString(),
+                fechaLegible: formatearFechaHora(fechaActual),
+                timestamp: fechaActual
+            };
+            
+            // Actualizar plaza localmente
+            plaza.ocupada = false;
+            plaza.estado = 'libre';
+            plaza.patente = "";
+            plaza.nombre = "";
+            plaza.habitacion = "";
+            plaza.tipo = "";
+            plaza.tipoCliente = "";
+            plaza.observaciones = "";
+            plaza.ingreso = null;
+            plaza.numeroPlazaEst = "";
+            
+            // Agregar al historial
+            datos.historial.unshift(movimiento);
+            
+            // Guardar según el modo
+            if (datos.modoFirebase) {
+                await salidaFirebase(plazaNum, movimiento);
+            } else {
+                guardarEnLocalStorage();
+                mostrarMensajeRapido('💾 Salida guardada localmente', 'info');
+            }
+            
+            // Actualizar UI
+            actualizarEstadisticas();
+            crearParkingGrid();
+            mostrarMensajeRapido(`✅ Plaza ${plazaNum} liberada`, 'exito');
+        }
+
+        async function salidaFirebase(plazaNum, movimiento) {
+            try {
+                await db.collection('plazas').doc(`plaza_${plazaNum}`).update({
+                    estado: 'libre',
+                    ocupada: false,
+                    patente: "",
+                    nombre: "",
+                    habitacion: "",
+                    tipo: "",
+                    tipoCliente: "",
+                    observaciones: "",
+                    ingreso: null,
+                    numeroPlazaEst: "",
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                await db.collection('movimientos').add({
+                    ...movimiento,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log(`✅ Salida guardada en Firebase: Plaza ${plazaNum}`);
+                
+            } catch (error) {
+                console.error("❌ Error al guardar salida en Firebase:", error);
+                throw error;
+            }
+        }
+
+        // ============ GUARDAR NÚMERO PLAZA EST ============
+        async function guardarNumeroPlazaEst() {
+            if (!datos.plazaSeleccionada || !datos.plazaSeleccionada.ocupada) return;
+            
+            const nuevoNumero = document.getElementById('numeroPlazaEstModal').value.trim();
+            
+            // Actualizar localmente
+            datos.plazaSeleccionada.numeroPlazaEst = nuevoNumero;
+            
+            if (datos.modoFirebase) {
+                try {
+                    await db.collection('plazas').doc(`plaza_${datos.plazaSeleccionada.numero}`).update({
+                        numeroPlazaEst: nuevoNumero,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("❌ Error al actualizar número de plaza en Firebase:", error);
+                    mostrarMensajeRapido('❌ Error al actualizar número de plaza', 'error');
+                    return;
+                }
+            } else {
+                guardarEnLocalStorage();
+            }
+            
+            mostrarMensajeRapido(`✅ Número de plaza actualizado: ${nuevoNumero || 'Eliminado'}`);
+            mostrarDetallesPlaza(datos.plazaSeleccionada);
+        }
+
+        // ============ ESTADÍSTICAS ============
+        function actualizarEstadisticas() {
+            const ocupadas = datos.plazas.filter(p => p.ocupada).length;
+            document.getElementById('total').textContent = CONSTANTS.TOTAL_PLAZAS.toString();
+            document.getElementById('ocupadas').textContent = ocupadas;
+            document.getElementById('libres').textContent = CONSTANTS.TOTAL_PLAZAS - ocupadas;
+        }
+
+        // ============ HISTORIAL ============
+        function verHistorial() {
+            document.getElementById('filtroPatente').value = '';
+            document.getElementById('filtroTipoCliente').value = '';
+            document.getElementById('modalHistorial').classList.add('active');
+            mostrarHistorialCompleto();
+        }
+
+        function mostrarHistorialCompleto() {
+            const body = document.getElementById('historialBody');
+            body.innerHTML = '';
+            
+            const historialParaMostrar = datos.historial.slice(0, 50);
+            
+            if (historialParaMostrar.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">No hay movimientos registrados</td></tr>';
+                document.getElementById('contadorHistorial').textContent = '0';
+                return;
+            }
+            
+            historialParaMostrar.forEach(movimiento => {
+                const row = document.createElement('tr');
+                row.className = movimiento.tipo === 'INGRESO' ? 'historial-ingreso' : 'historial-salida';
+                
+                row.innerHTML = `
+                    <td>${movimiento.fechaLegible}</td>
+                    <td><strong>${movimiento.tipo}</strong></td>
+                    <td>${movimiento.plaza}</td>
+                    <td>${movimiento.numeroPlazaEst || ''}</td>
+                    <td>${movimiento.patente || ''}</td>
+                    <td>${movimiento.tipoCliente || ''}</td>
+                `;
+                
+                body.appendChild(row);
+            });
+            
+            document.getElementById('contadorHistorial').textContent = historialParaMostrar.length;
+        }
+
+        function aplicarFiltrosHistorial() {
+            const patenteFiltro = document.getElementById('filtroPatente').value.toLowerCase();
+            const tipoClienteFiltro = document.getElementById('filtroTipoCliente').value;
+            
+            const body = document.getElementById('historialBody');
+            body.innerHTML = '';
+            
+            let movimientosFiltrados = datos.historial;
+            
+            if (patenteFiltro) {
+                movimientosFiltrados = movimientosFiltrados.filter(m => 
+                    m.patente && m.patente.toLowerCase().includes(patenteFiltro)
+                );
+            }
+            
+            if (tipoClienteFiltro) {
+                movimientosFiltrados = movimientosFiltrados.filter(m => m.tipoCliente === tipoClienteFiltro);
+            }
+            
+            movimientosFiltrados = movimientosFiltrados.slice(0, 50);
+            document.getElementById('contadorHistorial').textContent = movimientosFiltrados.length;
+            
+            if (movimientosFiltrados.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: hsl(var(--muted-foreground));">No hay movimientos con estos filtros</td></tr>';
+                return;
+            }
+            
+            movimientosFiltrados.forEach(movimiento => {
+                const row = document.createElement('tr');
+                row.className = movimiento.tipo === 'INGRESO' ? 'historial-ingreso' : 'historial-salida';
+                
+                row.innerHTML = `
+                    <td>${movimiento.fechaLegible}</td>
+                    <td><strong>${movimiento.tipo}</strong></td>
+                    <td>${movimiento.plaza}</td>
+                    <td>${movimiento.numeroPlazaEst || ''}</td>
+                    <td>${movimiento.patente || ''}</td>
+                    <td>${movimiento.tipoCliente || ''}</td>
+                `;
+                
+                body.appendChild(row);
+            });
+        }
+
+        function exportarHistorialExcel() {
+            const patenteFiltro = document.getElementById('filtroPatente').value.toLowerCase();
+            const tipoClienteFiltro = document.getElementById('filtroTipoCliente').value;
+            
+            let movimientosAExportar = datos.historial;
+            
+            if (patenteFiltro) {
+                movimientosAExportar = movimientosAExportar.filter(m => 
+                    m.patente && m.patente.toLowerCase().includes(patenteFiltro)
+                );
+            }
+            
+            if (tipoClienteFiltro) {
+                movimientosAExportar = movimientosAExportar.filter(m => m.tipoCliente === tipoClienteFiltro);
+            }
+            
+            if (movimientosAExportar.length === 0) {
+                mostrarMensajeRapido('❌ No hay datos para exportar con los filtros actuales', 'error');
+                return;
+            }
+            
+            let csv = 'Fecha;Accion;Plaza;N° Plaza Est;Patente;Tipo Cliente\r\n';
+            movimientosAExportar.forEach(movimiento => {
+                csv += `"${movimiento.fechaLegible}";${movimiento.tipo};${movimiento.plaza};${movimiento.numeroPlazaEst || ''};${movimiento.patente};${movimiento.tipoCliente}\r\n`;
+            });
+            
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Historial_Estacionamiento_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            mostrarMensajeRapido(`📊 Exportados ${movimientosAExportar.length} registros filtrados`);
+        }
+
+        // ============ FILTROS DE PLAZAS ============
+        function filtrarPlazas() {
+            const filtroEstado = document.getElementById('filtroEstado').value;
+            const busqueda = document.getElementById('buscar').value.toLowerCase();
+            
+            const spots = document.querySelectorAll('.spot-card');
+            
+            spots.forEach(spot => {
+                const numero = parseInt(spot.dataset.numero);
+                const plaza = datos.plazaMap[numero];
+                
+                let mostrar = true;
+                
+                if (filtroEstado === 'ocupadas' && !plaza.ocupada) mostrar = false;
+                if (filtroEstado === 'libres' && plaza.ocupada) mostrar = false;
+                
+                if (busqueda && mostrar) {
+                    const texto = `${plaza.numero} ${plaza.numeroPlazaEst} ${plaza.patente} ${plaza.nombre} ${plaza.habitacion} ${plaza.tipo} ${plaza.tipoCliente}`.toLowerCase();
+                    if (!texto.includes(busqueda)) mostrar = false;
+                }
+                
+                spot.style.display = mostrar ? 'flex' : 'none';
+            });
+        }
+
+        // ============ FUNCIONES DE MODALES ============
+        function abrirIngreso() {
+            document.getElementById('tipoAuto').value = '';
+            document.getElementById('tipoCliente').value = '';
+            document.getElementById('nombreIngreso').value = '';
+            document.getElementById('patenteIngreso').value = '';
+            document.getElementById('habitacionIngreso').value = '';
+            document.getElementById('observacionesIngreso').value = '';
+            document.getElementById('autorizadoInfo').style.display = 'none';
+            
+            document.getElementById('modalIngreso').classList.add('active');
+        }
+
+        function cerrarModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // ============ INICIALIZACIÓN ============
+        window.onload = function() {
+            console.log("📱 Aplicación cargando...");
+            
+            // Inicializar sistema
+            inicializarSistema();
+            
+            // Configurar sidebar
+            const sidebar = document.getElementById('sidebar');
+            sidebar.addEventListener('mouseenter', () => sidebar.classList.add('expanded'));
+            sidebar.addEventListener('mouseleave', () => sidebar.classList.remove('expanded'));
+            
+            // Event listeners para filtros con debounce
+            const filtrarPlazasDebounced = debounce(filtrarPlazas, CONSTANTS.DEBOUNCE_TIME);
+            document.getElementById('buscar').addEventListener('keyup', filtrarPlazasDebounced);
+            document.getElementById('filtroEstado').addEventListener('change', filtrarPlazasDebounced);
+            
+            // Event listeners para filtros de autorizados
+            const filtrarAutorizadosDebounced = debounce(filtrarAutorizados, CONSTANTS.DEBOUNCE_TIME);
+            document.getElementById('filtroPatenteAutorizados').addEventListener('keyup', filtrarAutorizadosDebounced);
+            document.getElementById('filtroNombreAutorizados').addEventListener('keyup', filtrarAutorizadosDebounced);
+            document.getElementById('filtroEmpresaAutorizados').addEventListener('keyup', filtrarAutorizadosDebounced);
+            
+            console.log("✅ Aplicación inicializada");
+        };
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+            if (event.target.classList.contains('spot-modal')) {
+                cerrarSpotModal();
+            }
+        };
+    </script>
+</body>
+</html>
